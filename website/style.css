@@ -1,0 +1,107 @@
+/* ===== Màu sắc: sửa tại đây để đổi màu cả trang ===== */
+:root {
+  --nen: #f4f6fb;        /* màu nền trang */
+  --chu: #1f2937;        /* màu chữ chính */
+  --chu-phu: #4b5563;    /* màu chữ giới thiệu */
+  --nhan: #4f46e5;       /* màu nhấn (tiêu đề, nút) */
+  --nhan-dam: #4338ca;   /* màu nút khi rê chuột */
+}
+
+/* ===== Cài đặt chung cho toàn trang ===== */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;               /* căn giữa nội dung */
+  align-items: center;         /* căn giữa theo chiều dọc */
+  justify-content: center;     /* căn giữa theo chiều ngang */
+  background: var(--nen);
+  color: var(--chu);
+  font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  line-height: 1.6;
+  padding: 24px;
+}
+
+/* ===== Khung chứa nội dung (dạng thẻ trắng bo góc) ===== */
+.container {
+  width: 100%;
+  max-width: 640px;
+  background: #ffffff;
+  padding: 48px 32px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+/* ===== Tiêu đề lớn ===== */
+h1 {
+  margin: 0 0 16px;
+  font-size: clamp(2rem, 7vw, 3rem); /* tự co giãn theo màn hình */
+  color: var(--nhan);
+}
+
+/* ===== Đoạn giới thiệu ===== */
+.intro {
+  margin: 0 0 32px;
+  font-size: 1.1rem;
+  color: var(--chu-phu);
+}
+
+/* ===== Phần Dịch vụ: tiêu đề và danh sách 3 thẻ ===== */
+.services {
+  margin: 0 0 32px;
+}
+
+.services h2 {
+  margin: 0 0 20px;
+  font-size: 1.5rem;
+}
+
+.service-list {
+  display: grid;
+  grid-template-columns: 1fr;               /* điện thoại: xếp 1 cột */
+  gap: 16px;
+}
+
+@media (min-width: 600px) {
+  .service-list {
+    grid-template-columns: repeat(3, 1fr);  /* máy tính: 3 cột ngang */
+  }
+}
+
+.service {
+  background: var(--nen);
+  padding: 20px 16px;
+  border-radius: 12px;
+}
+
+.service h3 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  color: var(--nhan);
+}
+
+.service p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--chu-phu);
+}
+
+/* ===== Nút "Liên hệ" ===== */
+.button {
+  display: inline-block;
+  padding: 14px 32px;
+  background: var(--nhan);
+  color: #ffffff;
+  text-decoration: none;       /* bỏ gạch chân */
+  font-weight: 600;
+  border-radius: 999px;        /* bo tròn hai đầu */
+  transition: background 0.2s;
+}
+
+.button:hover {
+  background: var(--nhan-dam); /* đổi màu khi rê chuột */
+}
