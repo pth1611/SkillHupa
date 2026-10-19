@@ -1,0 +1,94 @@
+# Môi trường phát triển cục bộ: PostgreSQL + backend (+ tác vụ định kỳ khi cần).
+# Chạy:  cp .env.example .env  (điền SESSION_SECRET)  rồi  docker compose up --build
+# Frontend chạy riêng bằng Vite (thư mục frontend/, chưa có) và proxy /api về cổng 8000.
+
+x-backend: &backend
+  build: ./backend
+  environment:
+    ENVIRONMENT: development
+    DATABASE_URL: postgresql+psycopg://skillmkt:${POSTGRES_PASSWORD:-skillmkt}@db:5432/skillmkt
+    SESSION_SECRET: ${SESSION_SECRET:?Đặt SESSION_SECRET trong .env (xem .env.example)}
+    COOKIE_SECURE: "false"
+    DEV_LOGIN_ENABLED: ${DEV_LOGIN_ENABLED:-true}
+    ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:-}
+    ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID:-}
+    ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET:-}
+    ENTRA_API_AUDIENCE: ${ENTRA_API_AUDIENCE:-}
+    ENTRA_REDIRECT_URI: ${ENTRA_REDIRECT_URI:-http://localhost:5173/api/auth/callback}
+    ENTRA_GROUP_MANAGERS: ${ENTRA_GROUP_MANAGERS:-}
+    ENTRA_GROUP_REVIEWERS: ${ENTRA_GROUP_REVIEWERS:-}
+    ENTRA_GROUP_CREATORS: ${ENTRA_GROUP_CREATORS:-}
+    STANDARD_DEPARTMENTS: ${STANDARD_DEPARTMENTS:-}
+    WORK_SATURDAY_ANCHOR: ${WORK_SATURDAY_ANCHOR:-}
+    WORK_HOLIDAYS: ${WORK_HOLIDAYS:-}
+    SOURCE_TOKEN_GITHUB: ${SOURCE_TOKEN_GITHUB:-}
+    # Lưu gói: local (mặc định) hoặc azure với Azurite (docker compose --profile azure up)
+    STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+    AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-}
+  volumes:
+    - blobs:/srv/.data/blobs
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: skillmkt
+      POSTGRES_USER: skillmkt
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-skillmkt}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skillmkt -d skillmkt"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # Giả lập Azure Blob Storage cho dev. Dùng cùng STORAGE_BACKEND=azure và connection string của
+  # Azurite (xem .env.example). SAS URL trỏ về 127.0.0.1:10000 nên chỉ tải được từ máy chạy compose.
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--blobPort", "10000", "--loose"]
+    profiles: ["azure"]
+    ports:
+      - "127.0.0.1:10000:10000"
+    volumes:
+      - azurite:/data
+
+  migrate:
+    <<: *backend
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    <<: *backend
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/api/health/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  # Tác vụ định kỳ (nhắc việc, tự chia việc, quét nguồn). Chạy tay:
+  #   docker compose --profile jobs run --rm job
+  job:
+    <<: *backend
+    command: ["python", "-m", "app.jobs.scheduled"]
+    profiles: ["jobs"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+volumes:
+  pgdata:
+  blobs:
+  azurite:

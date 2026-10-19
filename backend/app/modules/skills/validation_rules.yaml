@@ -1,0 +1,56 @@
+# Quy tắc kiểm tra tự động (D15, D32). Chỉ người triển khai sửa file này qua pull request.
+# Quy tắc `fail` phải hẹp và chính xác vì không có ngoại lệ theo từng skill.
+
+limits:
+  max_files: 200
+  max_skill_md_bytes: 262144       # 256 KB
+  warn_file_bytes: 2097152         # 2 MB
+  max_scan_bytes_per_file: 1048576 # chỉ quét 1 MB đầu của mỗi file văn bản
+  max_findings_per_rule: 20
+
+# Phần mở rộng được coi là script để áp dụng quy tắc cảnh báo
+script_extensions: [".sh", ".bash", ".zsh", ".ps1", ".bat", ".cmd", ".py", ".js", ".ts", ".rb", ".pl"]
+
+binary_extensions: [".exe", ".dll", ".so", ".dylib", ".bin", ".class", ".jar", ".msi", ".com"]
+
+fail_patterns:
+  - id: commands.download_and_run
+    description: Tải nội dung từ mạng rồi chạy thẳng
+    regex: '(?i)\b(curl|wget)\b[^\n|]*\|\s*(sudo\s+)?(ba|z)?sh\b'
+  - id: commands.download_and_run
+    description: Tải nội dung từ mạng rồi chạy bằng trình thông dịch
+    regex: '(?i)\b(curl|wget)\b[^\n|]*\|\s*(sudo\s+)?python3?\b'
+  - id: commands.download_and_run
+    description: PowerShell tải và chạy mã từ mạng
+    regex: '(?i)\b(iex|invoke-expression)\b.*\b(iwr|irm|invoke-webrequest|invoke-restmethod|downloadstring)\b'
+  - id: commands.destructive
+    description: Xoá hàng loạt thư mục gốc hoặc thư mục home
+    regex: '(?i)\brm\s+-[a-z]*r[a-z]*f?[a-z]*\s+(/|~|\$HOME|\$\{HOME\})(\s|/?$|\*)'
+  - id: secrets.private_key
+    description: Khoá riêng bị lộ
+    regex: '-----BEGIN [A-Z ]*PRIVATE KEY-----'
+  - id: secrets.aws_access_key
+    description: Khoá truy cập AWS bị lộ
+    regex: '\b(AKIA|ASIA)[0-9A-Z]{16}\b'
+  - id: secrets.github_token
+    description: Token GitHub bị lộ
+    regex: '\bgh[pousr]_[A-Za-z0-9]{36,}\b'
+  - id: secrets.slack_token
+    description: Token Slack bị lộ
+    regex: '\bxox[baprs]-[A-Za-z0-9-]{10,}\b'
+  - id: secrets.azure_storage_key
+    description: Khoá lưu trữ Azure bị lộ
+    regex: 'AccountKey=[A-Za-z0-9+/=]{40,}'
+  - id: secrets.connection_string
+    description: Chuỗi kết nối chứa mật khẩu
+    regex: '(?i)\b(server|host|data source)=[^;\n]+;[^\n]*\b(password|pwd)=[^;\s]+'
+
+warn_patterns:
+  - id: commands.system_config
+    description: Ghi vào cấu hình hệ thống hoặc khoá SSH
+    regex: '(~|\$HOME)/\.(ssh|bashrc|zshrc|profile)\b|\bcrontab\b'
+    scripts_only: false
+  - id: commands.shell
+    description: Lệnh shell hoặc mạng cần Reviewer cân nhắc
+    regex: '(?i)\b(sudo|ssh|scp|nc|netcat|eval|exec|curl|wget)\b'
+    scripts_only: true

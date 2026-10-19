@@ -1,0 +1,9 @@
+# Giấy phép (mã SPDX) cho phép nhập skill từ nguồn ngoài (D50).
+# Chỉ người triển khai sửa file này qua pull request; nguồn đánh dấu `internal` không bị kiểm tra.
+allowed:
+  - MIT
+  - Apache-2.0
+  - BSD-2-Clause
+  - BSD-3-Clause
+  - ISC
+  - 0BSD

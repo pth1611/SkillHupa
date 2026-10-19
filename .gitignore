@@ -1,2 +1,24 @@
+# Bí mật và môi trường
 .env
 .venv
+backend/.env
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+
+# Công cụ
+.idea/
+.vscode/
+.DS_Store
+
+# Dữ liệu cục bộ khi phát triển
+.data/
+backend/.data/

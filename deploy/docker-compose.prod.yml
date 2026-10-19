@@ -1,0 +1,60 @@
+# THAM CHIẾU cấu hình production, không chạy trực tiếp: trên Azure các dịch vụ này là
+# Container Apps / Jobs. File này ghi lại image, lệnh, biến môi trường và lịch để dựng IaC
+# (Bicep/Terraform) và để đối chiếu khi review thay đổi. Bí mật lấy từ Key Vault qua
+# Managed Identity, không đặt giá trị trong repo.
+#
+# Image gắn tag theo commit SHA (không dùng `latest`) để rollback được.
+
+x-backend-env: &backend-env
+  ENVIRONMENT: production
+  # Bí mật (Key Vault): DATABASE_URL, SESSION_SECRET, ENTRA_CLIENT_SECRET, SOURCE_TOKEN_*
+  DATABASE_URL: ${DATABASE_URL}
+  SESSION_SECRET: ${SESSION_SECRET}
+  ENTRA_CLIENT_SECRET: ${ENTRA_CLIENT_SECRET}
+  # Cấu hình thường
+  COOKIE_SECURE: "true"
+  DEV_LOGIN_ENABLED: "false"  # ứng dụng từ chối khởi động nếu bật ở production
+  ENTRA_TENANT_ID: ${ENTRA_TENANT_ID}
+  ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID}
+  ENTRA_API_AUDIENCE: ${ENTRA_API_AUDIENCE}
+  ENTRA_REDIRECT_URI: https://skills.example.com/api/auth/callback
+  ENTRA_GROUP_MANAGERS: ${ENTRA_GROUP_MANAGERS}
+  ENTRA_GROUP_REVIEWERS: ${ENTRA_GROUP_REVIEWERS}
+  ENTRA_GROUP_CREATORS: ${ENTRA_GROUP_CREATORS}
+  # Gói và ảnh ở Blob Storage; Managed Identity cần role "Storage Blob Data Contributor" (đọc/ghi blob)
+  # và "Storage Blob Delegator" (cấp user delegation key để ký SAS).
+  STORAGE_BACKEND: azure
+  AZURE_STORAGE_ACCOUNT_URL: https://${STORAGE_ACCOUNT}.blob.core.windows.net
+  AZURE_STORAGE_CONTAINER: skills
+  STANDARD_DEPARTMENTS: ${STANDARD_DEPARTMENTS}
+  WORK_SATURDAY_ANCHOR: ${WORK_SATURDAY_ANCHOR}
+  WORK_HOLIDAYS: ${WORK_HOLIDAYS}
+
+services:
+  # Container Apps: ingress nội bộ, tối thiểu 2 bản sao.
+  backend:
+    image: ${ACR}.azurecr.io/skillmkt-backend:${GIT_SHA}
+    environment: *backend-env
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+
+  # Container Apps: ingress công khai (sau Front Door). Image gồm nginx + `frontend/dist`.
+  web:
+    image: ${ACR}.azurecr.io/skillmkt-web:${GIT_SHA}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - backend
+
+  # Chạy TRƯỚC khi bật revision backend mới (bước CD). Migration phải tương thích ngược một phiên bản.
+  migrate:
+    image: ${ACR}.azurecr.io/skillmkt-backend:${GIT_SHA}
+    environment: *backend-env
+    command: ["alembic", "upgrade", "head"]
+
+  # Container Apps Job, cron theo giờ làm việc (UTC+7): "0 1-10 * * 1-6" (08:00-17:00 giờ VN, thứ hai-thứ bảy).
+  # Việc: nhắc việc chưa giao, tự chia việc quá ngưỡng, nhắc quá hạn duyệt (D18, D28), quét nguồn đến hạn (D46)
+  # và dọn dẹp (bản nháp bỏ quên sau DRAFT_RETENTION_DAYS, nhật ký quá AUDIT_RETENTION_YEARS).
+  job:
+    image: ${ACR}.azurecr.io/skillmkt-backend:${GIT_SHA}
+    environment: *backend-env
+    command: ["python", "-m", "app.jobs.scheduled"]
