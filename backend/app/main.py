@@ -21,7 +21,7 @@ def create_app() -> FastAPI:
     configure_logging()
 
     app = FastAPI(
-        title="Skill Marketplace API",
+        title="Vita-skill API",
         docs_url=None if settings.environment == "production" else "/api/docs",
         redoc_url=None,
         openapi_url=None if settings.environment == "production" else "/api/openapi.json",

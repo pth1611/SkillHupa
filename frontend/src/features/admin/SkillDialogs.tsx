@@ -8,6 +8,7 @@ import {
   adminKeys, fetchAdminVersions, fetchImpact, fetchUsers, patchImportedSkill, removeSkill, restoreSkill, revokeVersion,
   transferSkill,
 } from '../../api/admin'
+import { autoClassify } from '../../api/reviews'
 import { fetchCategories, fetchDepartments, fetchSkill, fetchTags, skillKeys } from '../../api/skills'
 import { ApiError } from '../../api/client'
 import type { AdminSkillItem, UserData } from '../../api/types'
@@ -263,6 +264,15 @@ function EditForm({
   const [v, setV] = useState(initial)
   const [error, setError] = useState<string | null>(null)
   const done = useDone(onDone)
+  const [autoMsg, setAutoMsg] = useState<string | null>(null)
+  const auto = useMutation({
+    mutationFn: () => autoClassify(skillId, false),
+    onSuccess: (d) => {
+      if (d.category_id) setV((prev) => ({ ...prev, category_id: d.category_id as number }))
+      setAutoMsg(d.applied ? t('reviews.classifyAutoDone') : t('reviews.classifyNone'))
+    },
+    onError: (e) => setError(errorMessage(e, t('state.error'))),
+  })
   const mutation = useMutation({
     mutationFn: () =>
       patchImportedSkill(skillId, {
@@ -309,10 +319,14 @@ function EditForm({
             onChange={(_, value) => setV({ ...v, tag_ids: value.map((x) => x.id) })}
             renderInput={(params) => <TextField {...params} label={t('studio.tags')} />}
           />
+          {autoMsg && <Alert severity="info">{autoMsg}</Alert>}
           {error && <Alert severity="error">{error}</Alert>}
         </Stack>
       </DialogContent>
       <DialogActions>
+        <Button disabled={auto.isPending} onClick={() => auto.mutate()} sx={{ mr: 'auto' }}>
+          {t('reviews.classifyAuto')}
+        </Button>
         <Button onClick={onClose}>{t('common.cancel')}</Button>
         <Button variant="contained" disabled={mutation.isPending} onClick={() => mutation.mutate()}>
           {t('admin.sources.save')}

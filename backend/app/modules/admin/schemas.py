@@ -112,3 +112,5 @@ class ImportedSkillUpdate(BaseModel):
     department: str | None = Field(None, min_length=1, max_length=255)
     visibility: Literal["company", "department"] | None = None
     tag_ids: list[int] | None = None
+    output_types: list[str] | None = None
+    ecosystems: list[str] | None = None

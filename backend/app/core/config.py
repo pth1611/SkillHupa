@@ -1,4 +1,5 @@
 from datetime import date
+from pathlib import Path
 from functools import lru_cache
 from typing import Literal
 
@@ -6,8 +7,12 @@ from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+# .env duy nhất nằm ở thư mục gốc của repo (cùng file docker compose đọc).
+ROOT_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
+
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=ROOT_ENV_FILE, extra="ignore")
 
     environment: Literal["development", "test", "production"] = "development"
     database_url: str = "postgresql+psycopg://skillmkt:skillmkt@localhost:5432/skillmkt"

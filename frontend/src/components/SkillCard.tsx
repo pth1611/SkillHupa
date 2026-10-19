@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Link as RouterLink } from 'react-router-dom'
 import { skillIconUrl } from '../api/skills'
 import type { SkillCardData } from '../api/types'
+import { taxonomyLabel } from '../utils/taxonomy'
 import { brand } from '../theme/brand'
 
 /** Biểu tượng mặc định: chữ cái đầu trên màu cố định theo tên (skill chưa có ảnh, D39). */
@@ -62,6 +63,9 @@ export function SkillCard({ skill }: { skill: SkillCardData }) {
           </Typography>
 
           <Stack direction="row" spacing={0.5} sx={{ mt: 'auto', flexWrap: 'wrap', rowGap: 0.5 }}>
+            {skill.output_types.slice(0, 2).map((slug) => (
+              <Chip key={slug} size="small" variant="outlined" color="primary" label={taxonomyLabel(t, 'output', slug)} />
+            ))}
             {skill.tags.slice(0, 3).map((tag) => (
               <Chip key={tag} size="small" label={tag} />
             ))}

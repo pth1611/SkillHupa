@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings
 from app.core.exceptions import Conflict
 from app.core.storage import BlobStorage
-from app.modules.skills import packaging, repository, service, validation
+from app.modules.skills import classifier, packaging, repository, service, validation
 from app.modules.skills.models import (
     Origin,
     Phase,
@@ -99,7 +99,7 @@ def import_version(
     source_commit: str,
     upstream_author: str | None,
     license_id: str | None,
-    category_id: int,
+    category_id: int | None,
     department: str,
     visibility: str,
     now: datetime,
@@ -108,7 +108,10 @@ def import_version(
     info = service._inspect(settings, package)
     prefill = service._prefill(info)
     created = skill is None
+    guess = classifier.suggest(info)
     if skill is None:
+        if category_id is None:  # nguồn đặt "tự động": chọn danh mục theo luật, không khớp thì để trống
+            category_id = repository.category_id_by_slug(db, guess.category_slug)
         name = (prefill.name or path.rsplit("/", 1)[-1] or source_name).strip()[:100]
         if repository.name_key_taken(db, name.lower(), exclude_skill_id=-1):
             name = f"{name} ({source_name})"[:100]
@@ -132,6 +135,7 @@ def import_version(
                 last_synced_at=now,
             ),
         )
+        service.apply_auto_classification(db, skill.id, guess)
     else:
         skill.license = license_id
         skill.source_url = source_url
@@ -182,7 +186,10 @@ def set_upstream_status(skill: Skill, status: str, now: datetime) -> bool:
     return changed
 
 
-def update_display(db: Session, skill: Skill, data: dict, tag_ids: list[int] | None) -> Skill:
+def update_display(
+    db: Session, skill: Skill, data: dict, tag_ids: list[int] | None,
+    output_types: list[str] | None = None, ecosystems: list[str] | None = None,
+) -> Skill:
     """Manager sửa thông tin hiển thị của skill thu thập; không đụng tới nội dung gói (D48)."""
     if skill.origin != Origin.IMPORTED.value:
         raise Conflict("Chỉ sửa thông tin hiển thị của skill thu thập; skill nội bộ do chủ skill sửa")
@@ -194,5 +201,6 @@ def update_display(db: Session, skill: Skill, data: dict, tag_ids: list[int] | N
         if bad:
             raise Conflict("Chỉ gắn được tag đã duyệt", {"tag_ids": bad})
         repository.set_skill_tags(db, skill.id, tag_ids)
+    service.set_classification(db, skill.id, output_types, ecosystems)
     db.flush()
     return skill

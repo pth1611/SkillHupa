@@ -1,7 +1,7 @@
 import AddIcon from '@mui/icons-material/Add'
 import {
   Alert, Box, Button, Card, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel,
-  MenuItem, Pagination, Snackbar, Stack, Switch, TextField, Typography,
+  LinearProgress, MenuItem, Pagination, Snackbar, Stack, Switch, TextField, Typography,
 } from '@mui/material'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -29,7 +29,7 @@ function SourceForm({ source, onClose, onSaved }: { source: SourceData | null; o
   const [name, setName] = useState(source?.name ?? '')
   const [ref, setRef] = useState(source?.ref ?? '')
   const [path, setPath] = useState(source?.path_glob ?? '')
-  const [category, setCategory] = useState<number | ''>(source?.default_category ?? '')
+  const [category, setCategory] = useState<number | 'auto' | ''>(source ? (source.default_category ?? 'auto') : '')
   const [department, setDepartment] = useState(source?.default_department ?? '')
   const [visibility, setVisibility] = useState<'company' | 'department'>(source?.default_visibility ?? 'company')
   const [credential, setCredential] = useState(source?.credential_name ?? '')
@@ -44,7 +44,7 @@ function SourceForm({ source, onClose, onSaved }: { source: SourceData | null; o
     mutationFn: () => {
       const body = {
         name: name.trim() || null, ref: ref.trim() || null, path_glob: path.trim(),
-        default_category: Number(category), default_department: department.trim(),
+        default_category: category === 'auto' ? null : Number(category), default_department: department.trim(),
         default_visibility: visibility, credential_name: credential.trim() || null, internal,
       }
       return source
@@ -71,7 +71,9 @@ function SourceForm({ source, onClose, onSaved }: { source: SourceData | null; o
               helperText={t('admin.sources.pathHelp')} />
           </Stack>
           <TextField select required label={t('studio.category')} value={category}
-            onChange={(e) => setCategory(Number(e.target.value))}>
+            onChange={(e) => setCategory(e.target.value === 'auto' ? 'auto' : Number(e.target.value))}
+            helperText={category === 'auto' ? t('admin.sources.categoryAutoHelp') : undefined}>
+            <MenuItem value="auto">{t('admin.sources.categoryAuto')}</MenuItem>
             {(categories.data ?? []).map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
           </TextField>
           {(departments.data ?? []).length > 0 ? (
@@ -108,6 +110,38 @@ function SourceForm({ source, onClose, onSaved }: { source: SourceData | null; o
   )
 }
 
+/** Tiến độ quét trực tiếp: hỏi lại bản quét mới nhất mỗi giây trong lúc yêu cầu quét còn treo. */
+function ScanProgress({ sourceId }: { sourceId: number }) {
+  const { t } = useTranslation()
+  const live = useQuery({
+    queryKey: [...sourceKeys.scans(sourceId, 1), 'live'],
+    queryFn: () => fetchScans(sourceId, 1),
+    refetchInterval: 1000,
+    gcTime: 0,
+  })
+  const scan = live.data?.items[0]
+  if (!scan || scan.status !== 'running') return <LinearProgress />
+  const done = scan.items.length
+  const total = scan.total
+  return (
+    <Stack spacing={1} role="status" aria-live="polite">
+      {total ? <LinearProgress variant="determinate" value={Math.min(100, (done / total) * 100)} /> : <LinearProgress />}
+      <Typography variant="caption" color="text.secondary">
+        {total ? t('admin.sources.progress', { done, total }) : t('admin.sources.progressListing')}
+        {scan.message ? ` · ${scan.message}` : ''}
+      </Typography>
+      {scan.items.slice(-8).map((item, i) => (
+        <Stack key={`${done}-${i}`} direction="row" spacing={1} alignItems="baseline" flexWrap="wrap">
+          <Chip size="small" color={OUTCOME_COLOR[item.outcome] ?? 'default'}
+            label={t(`admin.sources.outcome.${item.outcome}`, { defaultValue: item.outcome })} />
+          <Typography variant="body2" sx={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>{item.path}</Typography>
+          {item.version && <Typography variant="caption">v{item.version}</Typography>}
+        </Stack>
+      ))}
+    </Stack>
+  )
+}
+
 function ScanHistory({ source, onClose }: { source: SourceData; onClose: () => void }) {
   const { t } = useTranslation()
   const [page, setPage] = useState(1)
@@ -125,7 +159,7 @@ function ScanHistory({ source, onClose }: { source: SourceData; onClose: () => v
             <Card key={scan.id} sx={{ p: 1.5 }}>
               <Stack spacing={1}>
                 <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                  <Chip size="small" color={scan.status === 'ok' ? 'success' : 'error'} label={scan.status} />
+                  <Chip size="small" color={scan.status === 'ok' ? 'success' : scan.status === 'running' ? 'info' : 'error'} label={scan.status} />
                   <Typography variant="caption" color="text.secondary">
                     {new Date(scan.started_at).toLocaleString()}
                     {scan.commit ? ` · ${scan.commit.slice(0, 7)}` : ''}
@@ -251,6 +285,7 @@ export function SourcesPage() {
               {s.last_scan_message && (
                 <Alert severity={s.last_scan_status === 'error' ? 'error' : 'info'}>{s.last_scan_message}</Alert>
               )}
+              {scanningId === s.id && <ScanProgress sourceId={s.id} />}
               <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ rowGap: 0.5 }}>
                 <Button size="small" variant="contained" disabled={scanningId === s.id} onClick={() => scan.mutate(s)}>
                   {scanningId === s.id ? t('admin.sources.scanning') : t('admin.sources.scanNow')}

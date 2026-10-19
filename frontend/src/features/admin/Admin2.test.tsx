@@ -246,7 +246,7 @@ describe('SourcesPage', () => {
   it('lịch sử quét liệt kê từng thư mục kèm lý do bỏ qua', async () => {
     const scan: ScanData = {
       id: 1, source_id: 3, started_at: '2026-01-01T00:00:00Z', finished_at: null, status: 'ok', message: null,
-      commit: 'abcdef1234', counts: { skipped: 1 },
+      commit: 'abcdef1234', counts: { skipped: 1 }, total: 1,
       items: [{ path: 'tools/a', outcome: 'skipped', reason: 'Giấy phép GPL-3.0 không nằm trong danh sách cho phép' }],
     }
     mockApi({

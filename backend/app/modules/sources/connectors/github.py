@@ -1,3 +1,4 @@
+import base64
 import io
 import re
 import tarfile
@@ -17,6 +18,10 @@ MAX_TARBALL_BYTES = 100 * 1024 * 1024
 MAX_MEMBER_BYTES = 10 * 1024 * 1024
 MAX_RATE_WAIT = 3700  # giây; hạn mức GitHub đặt lại trong vòng một giờ, chờ lâu hơn thì báo lỗi
 WAIT_CHUNK = 300  # giây; chia nhỏ lúc ngủ để báo tiến độ và giữ khoá quét
+
+
+class TarballTooBig(ConnectorError):
+    """Gói repo vượt giới hạn; connector chuyển sang tải từng file."""
 
 
 def parse_repo_url(url: str) -> tuple[str, str] | None:
@@ -44,7 +49,9 @@ class GitHubConnector:
         self._client = client or httpx.Client(base_url=API, headers=headers, timeout=20.0)
         # Gọi với (số giây còn phải chờ, mốc epoch được dùng lại) mỗi khi đang chờ hạn mức.
         self.on_wait = on_wait
-        self._paths: set[str] = set()
+        self._paths: dict[str, str] = {}  # đường dẫn -> sha của blob
+        self._tree_bytes = 0
+        self._tarball_too_big = False
         self._tree_commit: str | None = None
         self._blobs: dict[str, bytes] = {}
         self._blobs_commit: str | None = None
@@ -133,7 +140,8 @@ class GitHubConnector:
 
     def list_files(self, commit: str) -> list[RemoteFile]:
         entries = self._tree(commit)
-        self._paths = {e["path"] for e in entries if e["type"] == "blob"}
+        self._paths = {e["path"]: e["sha"] for e in entries if e["type"] == "blob"}
+        self._tree_bytes = sum(e.get("size", 0) for e in entries if e["type"] == "blob")
         self._tree_commit = commit
         # mode 120000 là symlink nên bị loại; submodule có type = commit nên cũng không vào đây.
         return [
@@ -162,7 +170,7 @@ class GitHubConnector:
         else:
             data = resp.content
         if len(data) > MAX_TARBALL_BYTES:
-            raise ConnectorError("Gói repo quá lớn để quét")
+            raise TarballTooBig("Gói repo quá lớn để quét")
         self._blobs = self._extract(data)
         self._blobs_commit = commit
 
@@ -172,7 +180,7 @@ class GitHubConnector:
         for chunk in resp.iter_bytes():
             buf += chunk
             if len(buf) > MAX_TARBALL_BYTES:
-                raise ConnectorError("Gói repo quá lớn để quét")
+                raise TarballTooBig("Gói repo quá lớn để quét")
         return bytes(buf)
 
     @staticmethod
@@ -190,13 +198,31 @@ class GitHubConnector:
             raise ConnectorError("Gói repo tải về không hợp lệ") from exc
         return blobs
 
+    def _fetch_blob(self, path: str) -> bytes:
+        """Repo quá lớn để tải cả gói: chỉ tải đúng các file cần dùng, mỗi file một request."""
+        data = self._get(f"/git/blobs/{self._paths[path]}")
+        if data.get("encoding") != "base64":
+            raise ConnectorError(f"GitHub trả file {path} ở dạng không hỗ trợ")
+        blob = base64.b64decode(data["content"])
+        if len(blob) > MAX_MEMBER_BYTES:
+            raise ConnectorError(f"File {path} quá lớn để quét")
+        return blob
+
     def fetch(self, commit: str, path: str) -> bytes:
         if self._tree_commit != commit:
             self.list_files(commit)
         if path not in self._paths:
             raise ConnectorError(f"Không thấy file {path} trong commit")
-        if self._blobs_commit != commit:
-            self._load_tarball(commit)
+        if self._blobs_commit != commit and not self._tarball_too_big:
+            if self._tree_bytes > MAX_TARBALL_BYTES:
+                self._tarball_too_big = True
+            else:
+                try:
+                    self._load_tarball(commit)
+                except TarballTooBig:
+                    self._tarball_too_big = True  # chỉ thử một lần, không tải lại cho từng thư mục
+        if self._tarball_too_big:
+            return self._fetch_blob(path)
         try:
             return self._blobs[path]
         except KeyError:

@@ -1,4 +1,4 @@
-# API – Skill Marketplace
+# API – Vita-skill
 
 > Trạng thái: **thiết kế mục tiêu.** Chưa có code; mỗi nhóm endpoint tương ứng một `router.py` trong `backend/app/modules/`. Nghiệp vụ và quyết định gốc xem [architecture.md](architecture.md) (D1–D51).
 
@@ -76,12 +76,14 @@ Module: `modules/skills`.
 
 | Method | Đường dẫn | Quyền | Mô tả |
 |---|---|---|---|
-| GET | `/api/skills` | U | Tìm/lọc skill `published`: `q`, `category`, `department`, `tag` (lặp được), `sort=newest\|popular\|name`, phân trang |
+| GET | `/api/skills` | U | Tìm/lọc skill `published`: `q`, `category`, `department`, `tag` (lặp được), `output_type` và `ecosystem` (lặp được, OR trong cùng chiều, D53), `sort=newest\|popular\|name`, phân trang |
 | GET | `/api/skills/featured` | U | Skill nổi bật cho trang chủ (D21) |
 | GET | `/api/skills/{id}` | U | Chi tiết, gồm `origin` (`internal\|imported`) và với skill thu thập: `source_url`, `upstream_author`, `license` (người thường chỉ xem được phiên bản `published`/`revoked`; chủ skill, R, M xem thêm bản khác): `summary`, `skill_md` (của bản đang xem, `?version=`), tag, `latest_version`, `install_count`, `download_count`. `skill_md` là Markdown thô, **client phải làm sạch** khi hiển thị. Thêm: `tags` (tên tag đã duyệt), `owner_name`, `has_icon`, và `viewing_version` (phiên bản đang xem: mặc định bản mới nhất, hoặc `?version=`; `404` nếu không có hoặc không được xem) |
 | GET | `/api/skills/{id}/versions` | U | Lịch sử phiên bản `published` và `revoked`, kèm changelog. Chủ skill, R và M thấy thêm các bản `draft`, `pending`, `rejected` |
 | GET | `/api/skills/{id}/icon` | U | Ảnh biểu tượng của phiên bản `published` mới nhất (WebP); có kiểm tra phạm vi xem; hỗ trợ cache trình duyệt. Chủ skill, R, M thêm `?version=` để xem ảnh của bản chưa đăng |
 | GET | `/api/skills/{id}/download` | U | Cấp SAS URL tải gói. Tham số: `version` (mặc định `latest`), `intent=install\|zip` |
+| GET | `/api/skills/facets` | U | Số skill khớp theo từng giá trị: `{ total, categories: {id: n}, output_types: {slug: n}, ecosystems: {slug: n} }`; nhận cùng bộ lọc với `GET /api/skills`, mỗi chiều bỏ bộ lọc của chính nó khi đếm, áp phạm vi xem (D52, D53) |
+| GET | `/api/taxonomy` | U | Giá trị cho phép: `{ output_types[], ecosystems[] }` (slug, từ `taxonomy.yaml`) |
 | GET | `/api/categories` | U | Danh sách danh mục |
 | GET | `/api/departments` | U | Danh sách phòng ban chuẩn |
 | GET | `/api/tags` | U | Tag `approved` (`q`, `limit`), xếp theo mức dùng |
@@ -95,8 +97,10 @@ Module: `modules/skills`.
 | Method | Đường dẫn | Quyền | Mô tả |
 |---|---|---|---|
 | GET | `/api/skills/mine` | C | Skill của tôi (mọi trạng thái), kèm trạng thái phiên bản mới nhất |
-| POST | `/api/skills` | C | Tạo skill và phiên bản đầu (`multipart`: `metadata` JSON + `package` .zip + `icon` tùy chọn) → skill `draft`, phiên bản `draft`; **chạy kiểm tra xem trước (D42)**. Trả `201` với `{ skill, version, validation: { results[] }, prefill: { name, description, version } }`; lỗi `fail` không làm request lỗi, chỉ nằm trong `validation`. `metadata` là chuỗi JSON, **mọi trường tuỳ chọn ở bước này** (wizard bước 1 chỉ tải gói; thiếu thì lấy từ `SKILL.md`: tên, phiên bản): `name`, `summary` (tối đa 200 ký tự), `category_id`, `department` (mặc định phòng ban của người tạo), `visibility`, `version`, `changelog`, `tag_ids`. `summary`, `category_id` và `department` bắt buộc khi `submit`. `tag_ids` chỉ nhận tag `approved` (hoặc tag `pending` của chính người tạo) |
-| PATCH | `/api/skills/{id}` | C (chủ) | Sửa `summary`, danh mục, tag, `visibility`, `department` (phải thuộc danh sách phòng ban chuẩn). Thu hẹp `visibility` áp dụng ngay (`200`). Mở rộng (`department` → `company`, hoặc đổi `department` sang phòng ban khác) trả `202` kèm `{ skill, visibility_request: { id, status, to_visibility } }`, phạm vi cũ giữ nguyên trong lúc chờ (D27); đang có yêu cầu chờ thì `409`. Đổi `name` của skill đã đăng trả `409` |
+| POST | `/api/skills` | C | Tạo skill và phiên bản đầu (`multipart`: `metadata` JSON + `package` .zip + `icon` tùy chọn) → skill `draft`, phiên bản `draft`; **chạy kiểm tra xem trước (D42)**. Trả `201` với `{ skill, version, validation: { results[] }, prefill: { name, description, version, output_types[], ecosystems[], category_slug, name_suggestion } }` (bốn trường cuối là gợi ý phân loại và tên hiển thị tự động bằng luật, chỉ để wizard đổ sẵn; `GET /api/skills/{id}` trả thêm `auto_output_types[]`, `auto_ecosystems[]` là facet còn ở nguồn `auto`, chưa ai xác nhận); lỗi `fail` không làm request lỗi, chỉ nằm trong `validation`. `metadata` là chuỗi JSON, **mọi trường tuỳ chọn ở bước này** (wizard bước 1 chỉ tải gói; thiếu thì lấy từ `SKILL.md`: tên, phiên bản): `name`, `summary` (tối đa 200 ký tự), `category_id`, `department` (mặc định phòng ban của người tạo), `visibility`, `version`, `changelog`, `tag_ids`, `output_types[]`, `ecosystems[]` (slug thuộc `/api/taxonomy`, sai → `400 UNKNOWN_CLASSIFICATION`; không bắt buộc khi `submit`, D52). `summary`, `category_id` và `department` bắt buộc khi `submit`. `tag_ids` chỉ nhận tag `approved` (hoặc tag `pending` của chính người tạo) |
+| PUT | `/api/skills/{id}/classification` | R,M | Phân loại **thủ công** mọi skill: body `{ output_types?[], ecosystems?[] }` (`null`/vắng = giữ nguyên; slug sai → `400 UNKNOWN_CLASSIFICATION`). Nhãn đặt ra có nguồn `manual`; ghi nhật ký `skill.classify_manual`. Trả `{ output_types[], ecosystems[] }` |
+| POST | `/api/skills/{id}/classification/auto` | R,M | Phân loại **tự động** theo luật trên gói mới nhất; body `{ force?: false }`. Mặc định giữ nhãn do người chọn; `force=true` ghi đè cả nhãn `manual`. Skill chưa có gói → `409`. Trả `{ applied, output_types[], ecosystems[], suggested_output_types[], suggested_ecosystems[] }`; ghi nhật ký `skill.classify_auto` |
+| PATCH | `/api/skills/{id}` | C (chủ) | Sửa `summary`, danh mục, loại đầu ra, ứng dụng, tag, `visibility`, `department` (phải thuộc danh sách phòng ban chuẩn). Thu hẹp `visibility` áp dụng ngay (`200`). Mở rộng (`department` → `company`, hoặc đổi `department` sang phòng ban khác) trả `202` kèm `{ skill, visibility_request: { id, status, to_visibility } }`, phạm vi cũ giữ nguyên trong lúc chờ (D27); đang có yêu cầu chờ thì `409`. Đổi `name` của skill đã đăng trả `409` |
 | POST | `/api/skills/{id}/versions` | C (chủ) | Tải phiên bản mới (`multipart`: `version`, `changelog`, `package`, `icon` tùy chọn) → `draft` |
 | PATCH | `/api/skills/{id}/versions/{version}` | C (chủ) | Sửa `version` (semver, lớn hơn mọi bản đã đăng) và `changelog` của phiên bản `draft`/`rejected` (wizard bước 2); chạy lại kiểm tra xem trước, trả `{ version, validation, prefill }`; bản bị từ chối sửa xong quay về `draft`. `409` nếu số phiên bản đã có |
 | PUT | `/api/skills/{id}/versions/{version}/icon` | C (chủ) | Thay ảnh biểu tượng của phiên bản đang `draft` (`multipart`: `icon`) |
@@ -209,7 +213,7 @@ Module: `modules/admin` (chỉ Manager). Mọi thao tác ghi `audit_logs` và th
 |---|---|
 | Đăng nhập | `/api/auth/login`, `/api/auth/callback` |
 | Trang chủ | `/api/skills/featured`, `/api/skills?sort=newest`, `/api/categories` |
-| Tìm kiếm | `/api/skills`, `/api/categories`, `/api/departments`, `/api/tags` |
+| Tìm kiếm | `/api/skills`, `/api/skills/facets`, `/api/taxonomy`, `/api/categories`, `/api/departments`, `/api/tags` |
 | Chi tiết skill | `/api/skills/{id}`, `/api/skills/{id}/versions`, `/api/skills/{id}/download?intent=zip` |
 | Skill của tôi | `/api/installs/me` |
 | Tạo / gửi skill | `/api/skills/mine`, `/api/skills`, `…/versions`, `…/submit` |

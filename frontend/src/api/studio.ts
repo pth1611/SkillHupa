@@ -26,6 +26,8 @@ export interface CreateMetadata {
   version?: string
   changelog?: string
   tag_ids?: number[]
+  output_types?: string[]
+  ecosystems?: string[]
 }
 
 export function createSkill(pkg: File, icon: File | null, metadata: CreateMetadata = {}) {
@@ -70,6 +72,8 @@ export interface SkillPatch {
   department?: string
   visibility?: 'company' | 'department'
   tag_ids?: number[]
+  output_types?: string[]
+  ecosystems?: string[]
 }
 
 export const patchSkill = (id: number, body: SkillPatch) =>

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import Conflict
 from app.core.storage import BlobStorage
-from app.modules.skills import packaging, validation
+from app.modules.skills import packaging, repository, validation
 from app.modules.skills.models import (
     Phase,
     Skill,
@@ -236,3 +236,8 @@ def icon_bytes(storage: BlobStorage, version: SkillVersion) -> bytes | None:
     if not version.icon_key or not storage.exists(version.icon_key):
         return None
     return storage.get(version.icon_key)
+
+
+def facets_of(db, skill_id: int) -> dict[str, list[str]]:
+    """Loại đầu ra và ứng dụng hiện có của skill, để Reviewer xem và chỉnh khi duyệt."""
+    return repository.facet_slugs_of(db, [skill_id]).get(skill_id, {"output_type": [], "ecosystem": []})

@@ -125,7 +125,8 @@ def create_source(db: Session, settings: Settings, manager: User, body: SourceCr
     if repository.get_by_url(db, url) is not None:
         raise SourceExists()
     skills_service.check_department(settings, body.default_department)
-    _check_category(db, body.default_category)
+    if body.default_category is not None:
+        _check_category(db, body.default_category)
     source = repository.add(
         db,
         SkillSource(
@@ -150,8 +151,9 @@ def update_source(
         source.ref = _clean_ref(data["ref"])
     if "path_glob" in data and data["path_glob"] is not None:
         source.path_glob = _clean_path(data["path_glob"])
-    if data.get("default_category") is not None:
-        _check_category(db, data["default_category"])
+    if "default_category" in data:
+        if data["default_category"] is not None:
+            _check_category(db, data["default_category"])
         source.default_category_id = data["default_category"]
     if data.get("default_department") is not None:
         skills_service.check_department(settings, data["default_department"])
@@ -356,6 +358,13 @@ def _wait_reporter(db: Session, settings: Settings, source: SkillSource, scan: S
     return report
 
 
+def _publish_progress(db: Session, scan: SourceScan, run: _Run) -> None:
+    """Ghi tiến độ ra DB (commit) để màn hình quản trị đọc được khi quét còn đang chạy."""
+    scan.items = list(run.items)
+    scan.counts = dict(run.counts)
+    db.commit()
+
+
 def scan_source(
     db: Session,
     settings: Settings,
@@ -375,7 +384,7 @@ def scan_source(
     run = _Run()
     status, message, commit_sha = "ok", None, None
     scan = repository.add_scan(
-        db, SourceScan(source_id=source.id, started_at=now, status="ok", counts={}, items=[])
+        db, SourceScan(source_id=source.id, started_at=now, status="running", counts={}, items=[])
     )
     try:
         conn = connector or connectors.build_connector(
@@ -390,7 +399,12 @@ def scan_source(
         prefix = source.path_glob
         dirs = _skill_dirs(files, prefix)
         notes: list[str] = []
+        scan.total = len(dirs)
+        scan.message = f"Tìm thấy {len(dirs)} skill, đang nhập…"
+        scan.commit = commit_sha
+        db.commit()
         for directory, members in dirs.items():
+            scan.message = f"Đang xử lý {directory or '.'}"
             existing = import_api.find_by_source_path(db, source.id, directory)
             try:
                 _import_dir(db, settings, storage, source, conn, info, directory, members, problem,
@@ -398,6 +412,7 @@ def scan_source(
             except ConnectorError as exc:
                 run.connector_errors += 1
                 run.add(directory or ".", "error", str(exc))
+            _publish_progress(db, scan, run)
         run.counts["upstream_changed"] = _sync_upstream_status(
             db, source, info, problem, set(dirs), now, scan.id
         )
@@ -409,6 +424,7 @@ def scan_source(
         status, message = "error", str(exc)[:500]
     except Exception:
         logger.exception("Quét nguồn %s thất bại", source.id)
+        db.rollback()  # phiên có thể đang ở trạng thái lỗi; tiến độ các thư mục trước đã được commit
         status, message = "error", "Lỗi không mong đợi khi quét nguồn"
 
     finished = utcnow()

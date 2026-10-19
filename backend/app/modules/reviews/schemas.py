@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class QueueItem(BaseModel):
@@ -22,6 +22,22 @@ class QueueItem(BaseModel):
 
 class AssignRequest(BaseModel):
     reviewer_id: int
+
+
+class BulkItem(BaseModel):
+    kind: Literal["version", "visibility"]
+    id: int
+
+
+class BulkAssignRequest(BaseModel):
+    reviewer_id: int
+    items: list[BulkItem] = Field(min_length=1, max_length=500)
+
+
+class BulkResult(BaseModel):
+    kind: Literal["version", "visibility"]
+    id: int
+    error: str | None = None
 
 
 class DecisionRequest(BaseModel):
@@ -59,6 +75,8 @@ class ReviewFinding(BaseModel):
 
 class VersionReviewDetail(BaseModel):
     version_id: int
+    output_types: list[str] = []
+    ecosystems: list[str] = []
     version: str
     status: str
     skill_id: int

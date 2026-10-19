@@ -336,12 +336,15 @@ def update_imported_display(db: Session, settings: Settings, manager: User, skil
     skill = _skill(db, skill_id)
     data = body.model_dump(exclude_unset=True)
     tag_ids = data.pop("tag_ids", None)
+    output_types = data.pop("output_types", None)
+    ecosystems = data.pop("ecosystems", None)
     if data.get("category_id") is not None and not any(
         c.id == data["category_id"] for c in skills_repo.list_categories(db)
     ):
         raise InvalidMerge("Danh mục không tồn tại")
     skills_service.check_department(settings, data.get("department"))
-    skills_import.update_display(db, skill, data, tag_ids)
+    skills_import.update_display(db, skill, data, tag_ids, output_types, ecosystems)
+    changed = {"tag_ids": tag_ids, "output_types": output_types, "ecosystems": ecosystems}
     audit.record(db, manager, "skill.update_display", "skill", skill.id,
-                 {"fields": sorted(data) + (["tag_ids"] if tag_ids is not None else [])})
+                 {"fields": sorted(data) + [k for k, v in changed.items() if v is not None]})
     return skill

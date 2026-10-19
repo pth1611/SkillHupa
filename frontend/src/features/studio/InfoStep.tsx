@@ -7,7 +7,8 @@ import { useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
-import { fetchCategories, fetchDepartments, fetchTags, skillKeys } from '../../api/skills'
+import { fetchCategories, fetchDepartments, fetchTags, fetchTaxonomy, skillKeys } from '../../api/skills'
+import { taxonomyLabel } from '../../utils/taxonomy'
 import { fetchMyTagProposals, proposeTag, studioKeys } from '../../api/studio'
 
 export interface InfoValues {
@@ -17,8 +18,18 @@ export interface InfoValues {
   department: string
   visibility: 'company' | 'department'
   tag_ids: number[]
+  output_types: string[]
+  ecosystems: string[]
   version: string
   changelog: string
+}
+
+/** Giá trị do bộ phân loại tự động gợi ý; wizard đánh nhãn cho tới khi Creator sửa hoặc xác nhận. */
+export interface Suggested {
+  name: string | null
+  category_id: number | null
+  output_types: string[]
+  ecosystems: string[]
 }
 
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
@@ -38,6 +49,7 @@ export function isGreater(candidate: string, existing: string[]): boolean {
 
 interface Props {
   defaults: InfoValues
+  suggested: Suggested
   /** Chỉ skill chưa từng đăng mới sửa được thông tin skill; bản mới của skill đã đăng chỉ hỏi số phiên bản và changelog. */
   skillFieldsEditable: boolean
   nameEditable: boolean
@@ -50,7 +62,7 @@ interface Props {
 }
 
 export function InfoStep({
-  defaults, skillFieldsEditable, nameEditable, releasedVersions, busy, error, missingFields, onSubmit, onBack,
+  defaults, suggested, skillFieldsEditable, nameEditable, releasedVersions, busy, error, missingFields, onSubmit, onBack,
 }: Props) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
@@ -61,6 +73,7 @@ export function InfoStep({
   const departments = useQuery({ queryKey: skillKeys.departments, queryFn: fetchDepartments })
   const tags = useQuery({ queryKey: skillKeys.tags(''), queryFn: () => fetchTags('') })
   const mine = useQuery({ queryKey: studioKeys.myTags, queryFn: fetchMyTagProposals })
+  const taxonomy = useQuery({ queryKey: skillKeys.taxonomy, queryFn: fetchTaxonomy })
 
   const schema = z.object({
     name: skillFieldsEditable && nameEditable ? z.string().trim().min(1, t('studio.required')).max(100) : z.string(),
@@ -69,6 +82,8 @@ export function InfoStep({
     department: skillFieldsEditable ? z.string().trim().min(1, t('studio.required')) : z.string(),
     visibility: z.enum(['company', 'department']),
     tag_ids: z.array(z.number()).max(10, t('studio.tagsMax')),
+    output_types: z.array(z.string()),
+    ecosystems: z.array(z.string()),
     version: z
       .string()
       .trim()
@@ -77,11 +92,13 @@ export function InfoStep({
     changelog: z.string(),
   })
 
-  const { control, handleSubmit, formState: { errors }, watch } = useForm<InfoValues>({
+  const { control, handleSubmit, formState: { errors }, watch, setValue } = useForm<InfoValues>({
     defaultValues: defaults,
     resolver: zodResolver(schema) as never,
   })
   const summary = watch('summary')
+  const currentName = watch('name')
+  const autoNote = t('studio.autoSuggested')
 
   const options = [
     ...(tags.data ?? []).map((tg) => ({ id: tg.id, name: tg.name, pending: false })),
@@ -120,6 +137,13 @@ export function InfoStep({
                   error={!!errors.name} helperText={errors.name?.message ?? t('studio.fromPackage')} />
               )}
             />
+            {nameEditable && suggested.name && suggested.name !== currentName.trim() && (
+              <Box>
+                <Button size="small" variant="outlined" onClick={() => setValue('name', suggested.name ?? '', { shouldValidate: true })}>
+                  {t('studio.useNameSuggestion', { name: suggested.name })}
+                </Button>
+              </Box>
+            )}
             <Controller
               name="summary"
               control={control}
@@ -134,7 +158,13 @@ export function InfoStep({
               control={control}
               render={({ field }) => (
                 <TextField {...field} select required label={t('studio.category')} error={!!errors.category_id}
-                  helperText={errors.category_id ? t('studio.required') : undefined}
+                  helperText={
+                    errors.category_id
+                      ? t('studio.required')
+                      : suggested.category_id !== null && field.value === suggested.category_id
+                        ? autoNote
+                        : undefined
+                  }
                   onChange={(e) => field.onChange(Number(e.target.value))}>
                   {(categories.data ?? []).map((c) => (
                     <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
@@ -171,6 +201,39 @@ export function InfoStep({
                 </Box>
               )}
             />
+            {(['output_types', 'ecosystems'] as const).map((name) => (
+              <Controller
+                key={name}
+                name={name}
+                control={control}
+                render={({ field }) => {
+                  const auto = suggested[name]
+                  const showNote = field.value.some((slug) => auto.includes(slug))
+                  const kind = name === 'output_types' ? 'output' : 'ecosystem'
+                  return (
+                  <Autocomplete
+                    multiple
+                    options={taxonomy.data?.[name] ?? []}
+                    renderTags={(value, getTagProps) =>
+                      value.map((slug, index) => (
+                        <Chip size="small" label={taxonomyLabel(t, kind, slug)}
+                          color={auto.includes(slug) ? 'info' : 'default'}
+                          variant={auto.includes(slug) ? 'outlined' : 'filled'}
+                          {...getTagProps({ index })} key={slug} />
+                      ))
+                    }
+                    getOptionLabel={(slug) => taxonomyLabel(t, name === 'output_types' ? 'output' : 'ecosystem', slug)}
+                    value={field.value}
+                    onChange={(_, value) => field.onChange(value)}
+                    renderInput={(params) => (
+                      <TextField {...params} label={t(`studio.${name === 'output_types' ? 'outputTypes' : 'ecosystems'}`)}
+                        helperText={`${t(`studio.${name === 'output_types' ? 'outputTypesHelp' : 'ecosystemsHelp'}`)}${showNote ? ` · ${autoNote}` : ''}`} />
+                    )}
+                  />
+                  )
+                }}
+              />
+            ))}
             <Controller
               name="tag_ids"
               control={control}

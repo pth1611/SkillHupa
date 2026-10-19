@@ -17,7 +17,7 @@ const skill = (over: Partial<SkillDetailData> = {}): SkillDetailData => ({
   visibility: 'company', status: 'published', origin: 'internal', owner_id: 2, owner_name: 'Lan Trần',
   has_icon: false, latest_version_id: 2, latest_version: version(2, '1.1.0'), viewing_version: version(2, '1.1.0'),
   skill_md: '# Hướng dẫn\n\nDùng **đậm**.\n\n[ok](https://example.com) [bad](javascript:alert(1))\n\n<script>alert(1)</script>\n\n![x](https://tracker.example/p.png)',
-  tags: ['excel'], tag_ids: [], install_count: 12, download_count: 3, source_url: null, source_name: null,
+  tags: ['excel'], tag_ids: [], output_types: ['code'], ecosystems: [], install_count: 12, download_count: 3, source_url: null, source_name: null,
   upstream_author: null, license: null, upstream_status: null, updated_at: '2026-01-01T00:00:00Z', ...over,
 })
 

@@ -7,7 +7,7 @@ import { me, mockApi, renderApp } from '../../test/utils'
 const card = (id: number, name: string): SkillCardData => ({
   id, name, summary: 'Mô tả ' + name, category_id: 10, department: null, visibility: 'company',
   origin: 'internal', source_name: null, license: null, latest_version: '1.0.0', has_icon: false,
-  tags: [], install_count: 0, download_count: 0, published_at: null,
+  tags: [], output_types: [], ecosystems: [], install_count: 0, download_count: 0, published_at: null,
 })
 
 function setup(total = 1) {
@@ -16,6 +16,10 @@ function setup(total = 1) {
     '/api/categories': () => [{ id: 10, name: 'Báo cáo', slug: 'bao-cao' }],
     '/api/departments': () => ['Kế toán', 'Nhân sự'],
     '/api/tags': () => [{ id: 1, name: 'excel', status: 'approved', usage_count: 2 }],
+    '/api/taxonomy': () => ({ output_types: ['code', 'document'], ecosystems: ['github'] }),
+    '/api/skills/facets': () => ({
+      total: 1, categories: { 10: 1 }, output_types: { code: 3, document: 0 }, ecosystems: { github: 2 },
+    }),
     '/api/skills': (url: URL) => ({
       items: total === 0 ? [] : [card(1, url.searchParams.get('q') ? 'Khớp từ khoá' : 'Mặc định')],
       total,
@@ -65,5 +69,19 @@ describe('SearchPage', () => {
     renderApp('/skills')
     await userEvent.click(await screen.findByRole('button', { name: /page 2|trang 2|Go to page 2/i }))
     await waitFor(() => expect(lastSkillsCall(calls).get('page')).toBe('2'))
+  })
+
+  it('lọc theo loại đầu ra và ứng dụng, chỉ hiện giá trị có skill kèm số đếm', async () => {
+    const { calls } = setup()
+    renderApp('/skills?ecosystem=github')
+    // "document" có số đếm 0 và không được chọn nên ẩn
+    expect(await screen.findByRole('checkbox', { name: 'Mã nguồn (3)' })).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: /Tài liệu/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'GitHub (2)' })).toBeChecked()
+    expect(lastSkillsCall(calls).getAll('ecosystem')).toEqual(['github'])
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Mã nguồn (3)' }))
+    await waitFor(() => expect(lastSkillsCall(calls).getAll('output_type')).toEqual(['code']))
+    expect(lastSkillsCall(calls).get('page')).toBe('1')  // đổi bộ lọc thì về trang 1
   })
 })

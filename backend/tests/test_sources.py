@@ -595,11 +595,11 @@ def test_github_connector_retries_on_retry_after(monkeypatch):
 
 
 def test_default_github_token_is_used_when_source_has_none(monkeypatch, tmp_path):
-    monkeypatch.chdir(tmp_path)  # không có .env
-    monkeypatch.setenv("SOURCE_TOKEN_GITHUB", "tok")
+    monkeypatch.setattr(connectors, "ROOT_ENV_FILE", tmp_path / ".env")  # không có .env
+    monkeypatch.setenv("GITHUB_TOKEN", "tok")
     assert connectors.resolve_token(None, "github") == "tok"
     assert connectors.resolve_token(None, "other") is None
-    monkeypatch.delenv("SOURCE_TOKEN_GITHUB")
+    monkeypatch.delenv("GITHUB_TOKEN")
     assert connectors.resolve_token(None, "github") is None
 
 
@@ -627,11 +627,66 @@ def test_scan_reports_rate_limit_wait_and_clears_message(w, fake):
 
 
 def test_token_is_read_from_dotenv_file_when_not_in_environ(tmp_path, monkeypatch):
-    (tmp_path / ".env").write_text("SOURCE_TOKEN_GITHUB=from-file\nSOURCE_TOKEN_ACME=acme-file\n")
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("SOURCE_TOKEN_GITHUB", raising=False)
+    (tmp_path / ".env").write_text("GITHUB_TOKEN=from-file\nSOURCE_TOKEN_ACME=acme-file\n")
+    monkeypatch.setattr(connectors, "ROOT_ENV_FILE", tmp_path / ".env")
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     monkeypatch.delenv("SOURCE_TOKEN_ACME", raising=False)
     assert connectors.resolve_token(None, "github") == "from-file"
     assert connectors.resolve_token("SOURCE_TOKEN_ACME") == "acme-file"
-    monkeypatch.setenv("SOURCE_TOKEN_GITHUB", "from-env")
-    assert connectors.resolve_token(None, "github") == "from-env"  # biến môi trường được ưu tiên
+    monkeypatch.setenv("GITHUB_TOKEN", "from-env")
+    assert connectors.resolve_token(None, "github") == "from-file"  # .env được ưu tiên, không bị biến cũ đè
+    (tmp_path / ".env").write_text("")
+    assert connectors.resolve_token(None, "github") == "from-env"  # không có trong .env thì lấy biến môi trường
+
+
+def test_token_dotenv_does_not_depend_on_working_directory(tmp_path, monkeypatch):
+    (tmp_path / ".env").write_text("GITHUB_TOKEN=from-file\n")
+    monkeypatch.setattr(connectors, "ROOT_ENV_FILE", tmp_path / ".env")
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    elsewhere = tmp_path / "backend"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    assert connectors.resolve_token(None, "github") == "from-file"
+
+
+def test_auto_category_source_classifies_on_scan(w, fake):
+    from app.core.database import get_session_factory
+    from app.modules.skills.models import Category
+
+    with get_session_factory()() as db:
+        cat = Category(name="Nhân sự", slug="nhan-su")
+        db.add(cat)
+        db.commit()
+        cat_id = cat.id
+    fake.skill("hr", name="Tuyển dụng", desc="Sàng lọc resume cho recruitment và onboarding")
+    fake.skill("misc", name="Hello", desc="Greets the user")
+    src = add_source(w, default_category=None)
+    assert src["default_category"] is None
+    assert scan(w, src["id"])["counts"]["new_skill"] == 2
+    cats = {s["name"]: w.manager.get(f"/api/skills/{s['id']}").json()["category_id"]
+            for s in w.manager.get("/api/admin/skills").json()["items"]}
+    assert cats["Tuyển dụng"] == cat_id and cats["Hello"] is None
+
+
+def test_github_connector_falls_back_to_blobs_when_repo_too_big(monkeypatch):
+    import base64
+
+    from app.modules.sources.connectors import github
+
+    monkeypatch.setattr(github, "MAX_TARBALL_BYTES", 3)  # cây thư mục 5 byte > 3
+    calls: list[str] = []
+    inner = _gh_transport(calls)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/git/blobs/s1"):
+            calls.append(request.url.path)
+            return httpx.Response(200, json={"encoding": "base64", "content": base64.b64encode(b"hello").decode()})
+        return inner.handler(request)
+
+    client = httpx.Client(base_url="https://api.github.com", transport=httpx.MockTransport(handler))
+    conn = GitHubConnector(URL, None, None, client=client)
+    conn.repo_info()
+    conn.list_files("abc")
+    assert conn.fetch("abc", "s/SKILL.md") == b"hello"
+    assert not any(p.endswith("/tarball/abc") for p in calls)  # không tải cả gói
+

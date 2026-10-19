@@ -6,13 +6,15 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings
 from app.core.exceptions import Conflict
 from app.core.storage import BlobStorage
+from app.modules.audit import service as audit
 from app.modules.installs import repository as installs_repo
-from app.modules.skills import packaging, repository, validation
+from app.modules.skills import classifier, packaging, repository, taxonomy, validation
 from app.modules.skills.exceptions import (
     InvalidPackage,
     PackageTooLarge,
     SkillNotFound,
     SubmissionIncomplete,
+    UnknownClassification,
     UnknownDepartment,
     VersionAlreadyExists,
     VersionNotDownloadable,
@@ -32,7 +34,13 @@ from app.modules.skills.models import (
     VersionStatus,
     Visibility,
 )
-from app.modules.skills.schemas import Prefill, SkillCard, SkillMetadata, SkillUpdate
+from app.modules.skills.schemas import (
+    FacetsOut,
+    Prefill,
+    SkillCard,
+    SkillMetadata,
+    SkillUpdate,
+)
 from app.modules.users.models import Role, User
 from app.shared.utils import utcnow
 
@@ -145,10 +153,15 @@ def _validate(
 def _prefill(info: packaging.PackageInfo) -> Prefill:
     fm = info.frontmatter
     version = fm.get("version")
+    guess = classifier.suggest(info)
     return Prefill(
         name=str(fm["name"]).strip() if fm.get("name") else None,
         description=str(fm["description"]).strip() if fm.get("description") else None,
         version=str(version) if version else None,
+        output_types=guess.output_types,
+        ecosystems=guess.ecosystems,
+        category_slug=guess.category_slug,
+        name_suggestion=classifier.suggest_name(info),
     )
 
 
@@ -264,6 +277,7 @@ def create_skill(
     )
     if meta.tag_ids:
         _set_tags(db, user, skill, meta.tag_ids)
+    set_classification(db, skill.id, meta.output_types, meta.ecosystems)
     return skill, _finish_preview(db, storage, settings, version, package, info, findings, icon)
 
 
@@ -372,6 +386,90 @@ def delete_version(db: Session, storage: BlobStorage, user: User, skill_id: int,
         db.delete(skill)
 
 
+def set_classification(
+    db: Session, skill_id: int, output_types: list[str] | None, ecosystems: list[str] | None
+) -> None:
+    """Đặt loại đầu ra và ứng dụng (D52); None = giữ nguyên. Slug phải có trong taxonomy.yaml."""
+    for kind, slugs in ((taxonomy.OUTPUT_TYPE, output_types), (taxonomy.ECOSYSTEM, ecosystems)):
+        if slugs is None:
+            continue
+        bad = taxonomy.unknown(kind, slugs)
+        if bad:
+            raise UnknownClassification(details={"kind": kind, "unknown": bad, "allowed": taxonomy.allowed(kind)})
+        repository.set_skill_facets(db, skill_id, kind, slugs)
+
+
+def apply_auto_classification(db: Session, skill_id: int, guess: classifier.Suggestion) -> bool:
+    """Gán facet do máy gợi ý (source=auto). Kind nào đã có giá trị do người chọn thì giữ nguyên.
+
+    Trả về True nếu có ghi gì đó. Kind nào máy không gợi ý được thì để trống, không xoá giá trị cũ.
+    """
+    changed = False
+    manual = repository.manual_facet_kinds(db, skill_id)
+    for kind, slugs, scores in (
+        (taxonomy.OUTPUT_TYPE, guess.output_types, guess.output_scores),
+        (taxonomy.ECOSYSTEM, guess.ecosystems, guess.ecosystem_scores),
+    ):
+        if kind in manual or not slugs:
+            continue
+        repository.set_skill_facets(db, skill_id, kind, slugs, source=repository.FACET_AUTO, scores=scores)
+        changed = True
+    return changed
+
+
+def latest_packaged_version(db: Session, skill: Skill) -> SkillVersion | None:
+    versions = [v for v in repository.list_versions(db, skill.id) if v.package_key]
+    latest = next((v for v in versions if v.id == skill.latest_version_id), None)
+    return latest or (versions[-1] if versions else None)
+
+
+def staff_classify_manual(
+    db: Session, staff: User, skill_id: int, output_types: list[str] | None, ecosystems: list[str] | None
+) -> dict[str, list[str]]:
+    """Manager/Reviewer chọn tay loại đầu ra và ứng dụng cho bất kỳ skill nào (ghi đè nhãn tự động)."""
+    skill = db.get(Skill, skill_id)
+    if skill is None:
+        raise SkillNotFound()
+    set_classification(db, skill.id, output_types, ecosystems)
+    audit.record(db, staff, "skill.classify_manual", "skill", skill.id,
+                 {"output_types": output_types, "ecosystems": ecosystems})
+    return repository.facet_slugs_of(db, [skill.id]).get(skill.id, {taxonomy.OUTPUT_TYPE: [], taxonomy.ECOSYSTEM: []})
+
+
+def staff_classify_auto(
+    db: Session, settings: Settings, storage: BlobStorage, staff: User, skill_id: int, *, force: bool = False
+) -> dict:
+    """Chạy bộ phân loại tự động trên gói mới nhất. force=True ghi đè cả nhãn do người chọn."""
+    skill = db.get(Skill, skill_id)
+    if skill is None:
+        raise SkillNotFound()
+    ver = latest_packaged_version(db, skill)
+    if ver is None:
+        raise Conflict("Skill chưa có gói để phân loại")
+    guess = classifier.suggest(_inspect(settings, storage.get(ver.package_key)))
+    if force:
+        for kind, slugs, scores in (
+            (taxonomy.OUTPUT_TYPE, guess.output_types, guess.output_scores),
+            (taxonomy.ECOSYSTEM, guess.ecosystems, guess.ecosystem_scores),
+        ):
+            if slugs:
+                repository.set_skill_facets(db, skill.id, kind, slugs, source=repository.FACET_AUTO, scores=scores)
+        applied = bool(guess.output_types or guess.ecosystems)
+    else:
+        applied = apply_auto_classification(db, skill.id, guess)
+    cat_id = repository.category_id_by_slug(db, guess.category_slug)
+    if cat_id and (force or skill.category_id is None):
+        skill.category_id = cat_id
+        applied = True
+    audit.record(db, staff, "skill.classify_auto", "skill", skill.id,
+                 {"force": force, "applied": applied, "output_types": guess.output_types,
+                  "ecosystems": guess.ecosystems, "category_id": skill.category_id})
+    current = repository.facet_slugs_of(db, [skill.id]).get(skill.id, {taxonomy.OUTPUT_TYPE: [], taxonomy.ECOSYSTEM: []})
+    return {"applied": applied, "output_types": current[taxonomy.OUTPUT_TYPE], "ecosystems": current[taxonomy.ECOSYSTEM],
+            "suggested_output_types": guess.output_types, "suggested_ecosystems": guess.ecosystems,
+            "category_id": skill.category_id}
+
+
 def _set_tags(db: Session, user: User, skill: Skill, tag_ids: list[int]) -> None:
     tags = repository.get_tags(db, list(set(tag_ids)))
     found = {t.id for t in tags}
@@ -414,6 +512,8 @@ def update_skill(
     if published and "name" in data and data["name"] != skill.name:
         raise Conflict("Không đổi được tên skill đã đăng")
     tag_ids = data.pop("tag_ids", None)
+    output_types = data.pop("output_types", None)
+    ecosystems = data.pop("ecosystems", None)
 
     pending: PendingVisibilityChange | None = None
     if published and ("visibility" in data or "department" in data):
@@ -428,6 +528,7 @@ def update_skill(
         setattr(skill, key, value.value if isinstance(value, Visibility) else value)
     if tag_ids is not None:
         _set_tags(db, user, skill, tag_ids)
+    set_classification(db, skill.id, output_types, ecosystems)
     db.flush()
     return skill, pending
 
@@ -509,6 +610,7 @@ def _cards(db: Session, skills: list[Skill]) -> list[SkillCard]:
     tags = repository.approved_tag_names(db, [s.id for s in skills])
     versions = repository.versions_by_id(db, [s.latest_version_id for s in skills])
     counts = installs_repo.install_counts(db, [s.id for s in skills])
+    facets = repository.facet_slugs_of(db, [s.id for s in skills])
     cards = []
     for skill in skills:
         latest = versions.get(skill.latest_version_id)
@@ -516,6 +618,8 @@ def _cards(db: Session, skills: list[Skill]) -> list[SkillCard]:
         card.latest_version = latest.version if latest else None
         card.has_icon = bool(latest and latest.icon_key)
         card.tags = tags.get(skill.id, [])
+        card.output_types = facets.get(skill.id, {}).get(taxonomy.OUTPUT_TYPE, [])
+        card.ecosystems = facets.get(skill.id, {}).get(taxonomy.ECOSYSTEM, [])
         card.install_count = counts.get(skill.id, 0)
         cards.append(card)
     return cards
@@ -529,6 +633,8 @@ def search(
     category_id: int | None,
     department: str | None,
     tags: list[str],
+    output_types: list[str] | None = None,
+    ecosystems: list[str] | None = None,
     sort: str,
     offset: int,
     limit: int,
@@ -542,11 +648,44 @@ def search(
         category_id=category_id,
         department=department,
         tags=tags,
+        output_types=output_types,
+        ecosystems=ecosystems,
         sort=sort,
         offset=offset,
         limit=limit,
     )
     return _cards(db, skills), total
+
+
+def facets(
+    db: Session,
+    user: User,
+    *,
+    q: str | None,
+    category_id: int | None,
+    department: str | None,
+    tags: list[str],
+    output_types: list[str],
+    ecosystems: list[str],
+) -> FacetsOut:
+    counts = repository.facet_counts(
+        db,
+        viewer_id=user.id,
+        viewer_department=user.department,
+        is_manager=user.role == Role.MANAGER.value,
+        q=q,
+        category_id=category_id,
+        department=department,
+        tags=tags,
+        output_types=output_types,
+        ecosystems=ecosystems,
+    )
+    return FacetsOut(
+        total=counts["total"],
+        categories=counts["category"],
+        output_types=counts[taxonomy.OUTPUT_TYPE],
+        ecosystems=counts[taxonomy.ECOSYSTEM],
+    )
 
 
 FEATURED_POOL = 500

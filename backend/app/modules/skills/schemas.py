@@ -16,6 +16,8 @@ class SkillMetadata(BaseModel):
     version: str | None = Field(None, max_length=32)
     changelog: str | None = None
     tag_ids: list[int] = []
+    output_types: list[str] = []
+    ecosystems: list[str] = []
 
 
 class VersionUpdate(BaseModel):
@@ -30,6 +32,8 @@ class SkillUpdate(BaseModel):
     department: str | None = Field(None, max_length=255)
     visibility: Visibility | None = None
     tag_ids: list[int] | None = None
+    output_types: list[str] | None = None
+    ecosystems: list[str] | None = None
 
 
 class FindingOut(BaseModel):
@@ -50,6 +54,11 @@ class Prefill(BaseModel):
     name: str | None = None
     description: str | None = None
     version: str | None = None
+    # Gợi ý phân loại tự động (classifier.py); wizard đổ sẵn, Creator xác nhận.
+    output_types: list[str] = []
+    ecosystems: list[str] = []
+    category_slug: str | None = None
+    name_suggestion: str | None = None
 
 
 class VersionOut(BaseModel):
@@ -80,6 +89,11 @@ class SkillOut(BaseModel):
     visibility: str
     status: str
     origin: str
+    output_types: list[str] = []
+    ecosystems: list[str] = []
+    # Slug do bộ phân loại tự động gán và chưa ai xác nhận (source=auto).
+    auto_output_types: list[str] = []
+    auto_ecosystems: list[str] = []
     owner_id: int | None = None
     latest_version_id: int | None = None
     download_count: int
@@ -137,6 +151,8 @@ class SkillCard(BaseModel):
     latest_version: str | None = None
     has_icon: bool = False
     tags: list[str] = []
+    output_types: list[str] = []
+    ecosystems: list[str] = []
     install_count: int = 0
     download_count: int = 0
     published_at: datetime | None = None
@@ -170,3 +186,38 @@ class DownloadOut(BaseModel):
     expires_at: datetime | None = None
     version: str
     checksum: str | None = None
+
+
+class FacetsOut(BaseModel):
+    """Số skill khớp theo từng giá trị phân loại, theo bộ lọc hiện tại (D52)."""
+
+    total: int
+    categories: dict[int, int]
+    output_types: dict[str, int]
+    ecosystems: dict[str, int]
+
+
+class TaxonomyOut(BaseModel):
+    output_types: list[str]
+    ecosystems: list[str]
+
+
+class ClassificationUpdate(BaseModel):
+    output_types: list[str] | None = None
+    ecosystems: list[str] | None = None
+
+
+class AutoClassifyRequest(BaseModel):
+    force: bool = False  # True: ghi đè cả nhãn do người chọn
+
+
+class ClassificationOut(BaseModel):
+    output_types: list[str]
+    ecosystems: list[str]
+
+
+class AutoClassifyOut(ClassificationOut):
+    applied: bool
+    suggested_output_types: list[str]
+    suggested_ecosystems: list[str]
+    category_id: int | None

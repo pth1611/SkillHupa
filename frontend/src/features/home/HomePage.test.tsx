@@ -7,7 +7,7 @@ import { me, mockApi, renderApp, unauthorized } from '../../test/utils'
 const card = (over: Partial<SkillCardData>): SkillCardData => ({
   id: 1, name: 'Báo cáo tuần', summary: 'Tạo báo cáo tuần', category_id: 10, department: 'Kế toán',
   visibility: 'company', origin: 'internal', source_name: null, license: null, latest_version: '1.2.0',
-  has_icon: false, tags: ['excel'], install_count: 7, download_count: 0, published_at: null, ...over,
+  has_icon: false, tags: ['excel'], output_types: [], ecosystems: [], install_count: 7, download_count: 0, published_at: null, ...over,
 })
 
 const categories = [

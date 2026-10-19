@@ -13,12 +13,17 @@ from app.modules.installs import repository as installs_repo
 from app.modules.installs import service as installs_service
 from app.modules.reviews import repository as reviews_repo
 from app.modules.reviews import service as reviews_service
-from app.modules.skills import repository, service
+from app.modules.skills import repository, service, taxonomy
 from app.modules.skills.models import SkillStatus, VersionStatus
 from app.modules.skills.schemas import (
+    AutoClassifyOut,
+    AutoClassifyRequest,
     CategoryOut,
+    ClassificationOut,
+    ClassificationUpdate,
     CreateSkillResponse,
     DownloadOut,
+    FacetsOut,
     FindingOut,
     SkillCard,
     SkillDetail,
@@ -28,6 +33,7 @@ from app.modules.skills.schemas import (
     SkillUpdate,
     TagOut,
     TagProposal,
+    TaxonomyOut,
     ValidationOut,
     VersionOut,
     VersionUpdate,
@@ -41,6 +47,8 @@ router = APIRouter(prefix="/api/skills", tags=["skills"])
 
 CreatorUser = Annotated[User, Depends(require_roles(Role.CREATOR))]
 Storage = Annotated[BlobStorage, Depends(get_storage)]
+ManagerUser = Annotated[User, Depends(require_roles(Role.MANAGER))]
+StaffUser = Annotated[User, Depends(require_roles(Role.MANAGER, Role.REVIEWER))]
 
 
 class InvalidMetadata(AppError):
@@ -86,6 +94,14 @@ def _owner_versions(db, versions) -> list[VersionOut]:
     return out
 
 
+def _skill_out(db, skill) -> SkillOut:
+    out = SkillOut.model_validate(skill)
+    facets = repository.facet_slugs_of(db, [skill.id]).get(skill.id, {})
+    out.output_types = facets.get(taxonomy.OUTPUT_TYPE, [])
+    out.ecosystems = facets.get(taxonomy.ECOSYSTEM, [])
+    return out
+
+
 def _read(upload: UploadFile | None, limit: int) -> bytes | None:
     if upload is None or not upload.filename:
         return None
@@ -102,6 +118,8 @@ def my_skills(db: DbSession, user: CreatorUser) -> list[SkillMineItem]:
         versions = repository.list_versions(db, skill.id)
         latest = versions[-1] if versions else None
         item = SkillMineItem.model_validate(skill)
+        facets = _skill_out(db, skill)
+        item.output_types, item.ecosystems = facets.output_types, facets.ecosystems
         item.latest_draft_version = _owner_versions(db, [latest])[0] if latest else None
         items.append(item)
     return items
@@ -125,7 +143,7 @@ def create_skill(
         db, storage, settings, user, meta, data, _read(icon, settings.max_icon_bytes)
     )
     return CreateSkillResponse(
-        skill=SkillOut.model_validate(skill),
+        skill=_skill_out(db, skill),
         version=VersionOut.model_validate(analysis.version),
         validation=_validation_out("preview", analysis.findings),
         prefill=analysis.prefill,
@@ -136,7 +154,7 @@ def create_skill(
 def update_skill(skill_id: int, body: SkillUpdate, db: DbSession, settings: SettingsDep, user: CreatorUser):
     skill, pending = service.update_skill(db, settings, user, skill_id, body)
     if pending is None:
-        return SkillOut.model_validate(skill)
+        return _skill_out(db, skill)
     # Mở rộng phạm vi xem phải duyệt lại: tạo yêu cầu, giữ phạm vi cũ trong lúc chờ (D27).
     req = reviews_service.create_visibility_request(
         db,
@@ -150,7 +168,7 @@ def update_skill(skill_id: int, body: SkillUpdate, db: DbSession, settings: Sett
     )
     return JSONResponse(
         {
-            "skill": SkillOut.model_validate(skill).model_dump(mode="json"),
+            "skill": _skill_out(db, skill).model_dump(mode="json"),
             "visibility_request": {"id": req.id, "status": req.status, "to_visibility": req.to_visibility},
         },
         status_code=202,
@@ -296,13 +314,46 @@ def search_skills(
     category: int | None = None,
     department: str | None = None,
     tag: Annotated[list[str] | None, Query()] = None,
+    output_type: Annotated[list[str] | None, Query()] = None,
+    ecosystem: Annotated[list[str] | None, Query()] = None,
     sort: Literal["newest", "popular", "name"] = "newest",
 ) -> Page[SkillCard]:
     items, total = service.search(
         db, user, q=q, category_id=category, department=department, tags=tag or [],
-        sort=sort, offset=page.offset, limit=page.page_size,
+        output_types=output_type or [], ecosystems=ecosystem or [], sort=sort, offset=page.offset, limit=page.page_size,
     )
     return Page(items=items, total=total, page=page.page, page_size=page.page_size)
+
+
+@router.put("/{skill_id}/classification", response_model=ClassificationOut)
+def classify_manual(skill_id: int, body: ClassificationUpdate, db: DbSession, staff: StaffUser) -> ClassificationOut:
+    facets = service.staff_classify_manual(db, staff, skill_id, body.output_types, body.ecosystems)
+    return ClassificationOut(output_types=facets[taxonomy.OUTPUT_TYPE], ecosystems=facets[taxonomy.ECOSYSTEM])
+
+
+@router.post("/{skill_id}/classification/auto", response_model=AutoClassifyOut)
+def classify_auto(
+    skill_id: int, body: AutoClassifyRequest, db: DbSession, settings: SettingsDep, storage: Storage,
+    manager: ManagerUser,
+) -> AutoClassifyOut:
+    return AutoClassifyOut(**service.staff_classify_auto(db, settings, storage, manager, skill_id, force=body.force))
+
+
+@router.get("/facets", response_model=FacetsOut)
+def skill_facets(
+    db: DbSession,
+    user: CurrentUser,
+    q: str | None = Query(None, max_length=100),
+    category: int | None = None,
+    department: str | None = None,
+    tag: Annotated[list[str] | None, Query()] = None,
+    output_type: Annotated[list[str] | None, Query()] = None,
+    ecosystem: Annotated[list[str] | None, Query()] = None,
+) -> FacetsOut:
+    return service.facets(
+        db, user, q=q, category_id=category, department=department, tags=tag or [],
+        output_types=output_type or [], ecosystems=ecosystem or [],
+    )
 
 
 @router.get("/featured", response_model=list[SkillCard])
@@ -367,6 +418,12 @@ def skill_detail(
     skill = service.get_visible_skill(db, user, skill_id)
     detail = SkillDetail.model_validate(skill)
     detail.tag_ids = repository.tag_ids_of(db, skill.id)
+    facets = repository.facet_slugs_of(db, [skill.id]).get(skill.id, {})
+    detail.output_types = facets.get(taxonomy.OUTPUT_TYPE, [])
+    detail.ecosystems = facets.get(taxonomy.ECOSYSTEM, [])
+    auto = repository.auto_facet_slugs(db, skill.id)
+    detail.auto_output_types = auto[taxonomy.OUTPUT_TYPE]
+    detail.auto_ecosystems = auto[taxonomy.ECOSYSTEM]
     detail.tags = repository.approved_tag_names(db, [skill.id]).get(skill.id, [])
     detail.install_count = installs_repo.install_counts(db, [skill.id]).get(skill.id, 0)
     if skill.owner_id is not None:
@@ -403,6 +460,11 @@ catalog_router = APIRouter(prefix="/api", tags=["catalog"])
 @catalog_router.get("/categories", response_model=list[CategoryOut])
 def categories(db: DbSession, user: CurrentUser) -> list[CategoryOut]:
     return [CategoryOut.model_validate(c) for c in repository.list_categories(db)]
+
+
+@catalog_router.get("/taxonomy", response_model=TaxonomyOut)
+def get_taxonomy(user: CurrentUser) -> TaxonomyOut:
+    return TaxonomyOut(output_types=taxonomy.allowed(taxonomy.OUTPUT_TYPE), ecosystems=taxonomy.allowed(taxonomy.ECOSYSTEM))
 
 
 @catalog_router.get("/departments", response_model=list[str])

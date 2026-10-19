@@ -1,4 +1,5 @@
 import { Alert, Box, Button, Card, CardContent, Chip, Container, Link, Stack, Typography } from '@mui/material'
+import { taxonomyLabel } from '../../utils/taxonomy'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { Link as RouterLink, useParams, useSearchParams } from 'react-router-dom'
@@ -151,6 +152,14 @@ export function SkillDetailPage() {
               }`}
             </Typography>
             <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mt: 1 }}>
+              {data.output_types.map((slug) => (
+                <Chip key={slug} size="small" variant="outlined" color="primary" label={taxonomyLabel(t, 'output', slug)}
+                  component={RouterLink} to={`/skills?output_type=${encodeURIComponent(slug)}`} clickable />
+              ))}
+              {data.ecosystems.map((slug) => (
+                <Chip key={slug} size="small" variant="outlined" label={taxonomyLabel(t, 'ecosystem', slug)}
+                  component={RouterLink} to={`/skills?ecosystem=${encodeURIComponent(slug)}`} clickable />
+              ))}
               {data.tags.map((tag) => (
                 <Chip key={tag} size="small" label={tag} component={RouterLink} to={`/skills?tag=${encodeURIComponent(tag)}`} clickable />
               ))}

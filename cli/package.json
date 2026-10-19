@@ -1,7 +1,7 @@
 {
   "name": "@company/skillmkt",
   "version": "0.1.0",
-  "description": "CLI cài và cập nhật skill từ Skill Marketplace nội bộ",
+  "description": "CLI cài và cập nhật skill từ Vita-skill nội bộ",
   "type": "module",
   "bin": {
     "skillmkt": "dist/index.js"

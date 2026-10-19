@@ -170,3 +170,16 @@ class SkillTag(Base):
 
     skill_id: Mapped[int] = mapped_column(ForeignKey("skills.id", ondelete="CASCADE"), primary_key=True)
     tag_id: Mapped[int] = mapped_column(ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True)
+
+
+class SkillFacet(Base):
+    """Nhãn phân loại cố định của skill: loại đầu ra hoặc hệ sinh thái (D52); slug lấy từ taxonomy.yaml."""
+
+    __tablename__ = "skill_facets"
+
+    skill_id: Mapped[int] = mapped_column(ForeignKey("skills.id", ondelete="CASCADE"), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), primary_key=True)
+    slug: Mapped[str] = mapped_column(String(50), primary_key=True)
+    # manual: Creator/Manager chọn hoặc xác nhận; auto: bộ phân loại gợi ý (classifier.py), kèm điểm tin cậy.
+    source: Mapped[str] = mapped_column(String(8), nullable=False, default="manual", server_default="manual")
+    score: Mapped[int | None] = mapped_column(Integer, nullable=True)

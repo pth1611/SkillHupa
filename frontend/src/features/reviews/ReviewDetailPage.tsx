@@ -16,6 +16,7 @@ import { MarkdownView } from '../../components/MarkdownView'
 import { ErrorState, LoadingState } from '../../components/StateViews'
 import { NotFoundPage } from '../common/pages'
 import { ValidationList } from '../studio/ValidationList'
+import { ClassificationPanel } from './ClassificationPanel'
 import { DecisionPanel } from './DecisionPanel'
 import { DiffView, PlainView } from './DiffView'
 import { waitingDays } from './ReviewQueuePage'
@@ -78,11 +79,15 @@ function FileViewer({ versionId, file, onViewed }: { versionId: number; file: Re
 }
 
 export function ReviewDetailPage() {
-  const { t } = useTranslation()
   const { versionId } = useParams()
-  const id = Number(versionId)
-  const { user } = useAuth()
   const navigate = useNavigate()
+  return <ReviewDetailView id={Number(versionId)} onDecided={() => navigate('/reviews', { replace: true })} />
+}
+
+/** Nội dung duyệt một phiên bản; dùng cho trang riêng và cho hộp thoại mở từ hàng đợi (embedded). */
+export function ReviewDetailView({ id, onDecided, embedded = false }: { id: number; onDecided: () => void; embedded?: boolean }) {
+  const { t } = useTranslation()
+  const { user } = useAuth()
   const queryClient = useQueryClient()
   const [filter, setFilter] = useState<FileFilter>('all')
   const [selected, setSelected] = useState<string | null>(null)
@@ -97,7 +102,7 @@ export function ReviewDetailPage() {
     mutationFn: (v: { decision: 'approved' | 'rejected'; comment: string | null }) => decideVersion(id, v.decision, v.comment),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: reviewKeys.all })
-      navigate('/reviews', { replace: true })
+      onDecided()
     },
     onError: (e) => setError(e instanceof ApiError ? e.message : t('state.error')),
   })
@@ -111,21 +116,25 @@ export function ReviewDetailPage() {
     return all
   }, [files.data, filter])
 
-  if (!valid || (detail.error instanceof ApiError && detail.error.status === 404)) return <NotFoundPage />
-  if (detail.isPending) return <LoadingState fullPage />
-  if (detail.isError) return <ErrorState fullPage onRetry={() => void detail.refetch()} />
+  if (!valid || (detail.error instanceof ApiError && detail.error.status === 404)) return embedded ? <ErrorState /> : <NotFoundPage />
+  if (detail.isPending) return <LoadingState fullPage={!embedded} />
+  if (detail.isError) return <ErrorState fullPage={!embedded} onRetry={() => void detail.refetch()} />
 
   const d = detail.data
   const current = files.data?.find((f) => f.path === selected) ?? null
   const unseen = (files.data ?? []).filter((f) => f.warnings > 0 && !viewed.has(f.path)).length
-  const canDecide = user?.role === 'reviewer' && d.status === 'pending'
+  const canDecide = (user?.role === 'reviewer' || user?.role === 'manager') && d.status === 'pending'
   const waiting = d.submitted_at ? waitingDays(d.submitted_at) : 0
 
   return (
-    <Container maxWidth="xl" sx={{ py: 3 }}>
+    <Container maxWidth="xl" disableGutters={embedded} sx={{ py: embedded ? 0 : 3 }}>
       <Stack spacing={2.5}>
         <Box>
-          <Button component={RouterLink} to="/reviews" size="small">← {t('reviews.backToQueue')}</Button>
+          {embedded ? (
+            <Button component={RouterLink} to={`/reviews/${id}`} size="small">{t('reviews.openFullPage')}</Button>
+          ) : (
+            <Button component={RouterLink} to="/reviews" size="small">← {t('reviews.backToQueue')}</Button>
+          )}
           <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
             {d.has_icon && <Avatar variant="rounded" src={reviewIconUrl(d.version_id)} alt="" sx={{ width: 48, height: 48 }} />}
             <Typography variant="h5" component="h1">
@@ -211,6 +220,16 @@ export function ReviewDetailPage() {
           <ValidationList results={d.validation} />
         </Box>
 
+        {(user?.role === 'reviewer' || user?.role === 'manager') && (
+          <ClassificationPanel
+            key={`${d.skill_id}:${d.output_types.join()}:${d.ecosystems.join()}`}
+            skillId={d.skill_id}
+            detailId={id}
+            output_types={d.output_types}
+            ecosystems={d.ecosystems}
+          />
+        )}
+
         {canDecide ? (
           <DecisionPanel
             busy={decide.isPending}
@@ -218,9 +237,7 @@ export function ReviewDetailPage() {
             unseenWarnings={unseen}
             onSubmit={(decision, comment) => decide.mutate({ decision, comment })}
           />
-        ) : (
-          user?.role === 'manager' && <Alert severity="info">{t('reviews.managerReadOnly')}</Alert>
-        )}
+        ) : null}
       </Stack>
     </Container>
   )

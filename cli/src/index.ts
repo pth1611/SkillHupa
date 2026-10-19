@@ -42,7 +42,7 @@ async function buildContext(): Promise<Context> {
 const program = new Command()
 program
   .name('skillmkt')
-  .description('Cài và cập nhật skill từ Skill Marketplace nội bộ')
+  .description('Cài và cập nhật skill từ Vita-skill nội bộ')
   .version(pkg.version)
   .showHelpAfterError()
 

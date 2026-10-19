@@ -31,6 +31,8 @@ export interface SkillCardData {
   latest_version: string | null
   has_icon: boolean
   tags: string[]
+  output_types: string[]
+  ecosystems: string[]
   install_count: number
   download_count: number
   published_at: string | null
@@ -40,6 +42,19 @@ export interface Category {
   id: number
   name: string
   slug: string
+}
+
+export interface Taxonomy {
+  output_types: string[]
+  ecosystems: string[]
+}
+
+/** Số skill khớp theo từng giá trị phân loại, theo bộ lọc hiện tại (D52). */
+export interface FacetsData {
+  total: number
+  categories: Record<string, number>
+  output_types: Record<string, number>
+  ecosystems: Record<string, number>
 }
 
 export type SkillSort = 'newest' | 'popular' | 'name'
@@ -73,6 +88,11 @@ export interface SkillDetailData {
   skill_md: string | null
   tags: string[]
   tag_ids: number[]
+  output_types: string[]
+  ecosystems: string[]
+  /** Slug do bộ phân loại tự động gán, chưa ai xác nhận. */
+  auto_output_types?: string[]
+  auto_ecosystems?: string[]
   install_count: number
   download_count: number
   source_url: string | null
@@ -139,6 +159,8 @@ export interface SkillMineData {
   status: SkillStatus
   origin: 'internal' | 'imported'
   latest_version_id: number | null
+  output_types: string[]
+  ecosystems: string[]
   download_count: number
   updated_at: string
   latest_draft_version: OwnerVersionData | null
@@ -162,6 +184,10 @@ export interface Prefill {
   name: string | null
   description: string | null
   version: string | null
+  output_types: string[]
+  ecosystems: string[]
+  category_slug: string | null
+  name_suggestion: string | null
 }
 
 export interface VersionWithValidation {
@@ -192,6 +218,8 @@ export interface QueueItemData {
 
 export interface ReviewDetailData {
   version_id: number
+  output_types: string[]
+  ecosystems: string[]
   version: string
   status: string
   skill_id: number
@@ -334,7 +362,7 @@ export interface SourceData {
   url: string
   ref: string | null
   path_glob: string
-  default_category: number
+  default_category: number | null
   default_department: string
   default_visibility: 'company' | 'department'
   credential_name: string | null
@@ -359,9 +387,10 @@ export interface ScanData {
   source_id: number
   started_at: string
   finished_at: string | null
-  status: 'ok' | 'error'
+  status: 'running' | 'ok' | 'error'
   message: string | null
   commit: string | null
   counts: Record<string, number>
   items: ScanItemData[]
+  total: number | null
 }

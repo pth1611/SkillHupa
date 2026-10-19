@@ -44,3 +44,21 @@ export const decideRequest = (id: number, decision: 'approved' | 'rejected', com
 
 export const reviewIconUrl = (versionId: number) => `/api/reviews/versions/${versionId}/icon`
 export const reviewPackageUrl = (versionId: number) => `/api/reviews/versions/${versionId}/package`
+
+export interface ClassificationData {
+  output_types: string[]
+  ecosystems: string[]
+}
+
+export interface AutoClassifyData extends ClassificationData {
+  applied: boolean
+  suggested_output_types: string[]
+  suggested_ecosystems: string[]
+  category_id: number | null
+}
+
+export const saveClassification = (skillId: number, body: ClassificationData) =>
+  api<ClassificationData>(`/api/skills/${skillId}/classification`, { method: 'PUT', json: body })
+
+export const autoClassify = (skillId: number, force: boolean) =>
+  api<AutoClassifyData>(`/api/skills/${skillId}/classification/auto`, { method: 'POST', json: { force } })

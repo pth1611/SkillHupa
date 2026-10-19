@@ -6,6 +6,7 @@ from dotenv import dotenv_values
 from sqlalchemy import create_engine, pool
 
 import app.db_models  # noqa: F401  (đăng ký mọi bảng vào Base.metadata)
+from app.core.config import ROOT_ENV_FILE
 from app.core.database import Base
 
 config = context.config
@@ -16,10 +17,10 @@ target_metadata = Base.metadata
 
 
 def _url() -> str:
-    # Biến môi trường thắng; nếu không có thì đọc backend/.env như ứng dụng (không cần SESSION_SECRET).
-    url = os.environ.get("DATABASE_URL") or dotenv_values(".env").get("DATABASE_URL")
+    # Biến môi trường thắng; nếu không có thì đọc .env ở thư mục gốc như ứng dụng (không cần SESSION_SECRET).
+    url = os.environ.get("DATABASE_URL") or dotenv_values(ROOT_ENV_FILE).get("DATABASE_URL")
     if not url:
-        raise RuntimeError("Thiếu DATABASE_URL (biến môi trường hoặc backend/.env)")
+        raise RuntimeError("Thiếu DATABASE_URL (biến môi trường hoặc .env ở thư mục gốc)")
     return url
 
 

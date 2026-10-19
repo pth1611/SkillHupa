@@ -1,0 +1,84 @@
+# Từ vựng phân loại cố định (D52). Chỉ người triển khai sửa qua pull request.
+# Giá trị lưu trong DB là slug; nhãn hiển thị nằm ở frontend (i18n, khoá `taxonomy.*`).
+# Khác với tag, các danh sách này đóng: Creator chỉ chọn, không đề xuất mới, không cần Manager duyệt.
+
+# Skill tạo ra loại sản phẩm gì (chọn nhiều).
+output_types:
+  - document
+  - spreadsheet
+  - slides
+  - image
+  - diagram-chart
+  - code
+  - dashboard
+  - video
+  - prompt
+
+# Skill làm việc với ứng dụng nào (chọn nhiều, có thể để trống).
+ecosystems:
+  - github
+  - gitlab
+  - azure-devops
+  - jira
+  - confluence
+  - teams
+  - sharepoint
+  - outlook
+  - notion
+  - figma
+  - slack
+
+# Tín hiệu để gợi ý phân loại tự động (classifier.py). Chỉ là gợi ý: Creator luôn xác nhận hoặc sửa.
+# extensions: đuôi file trong gói; keywords: cụm từ (không phân biệt hoa thường) trong tên, mô tả, SKILL.md.
+signals:
+  output_types:
+    document:
+      extensions: [docx, doc, pdf, odt, rtf]
+      keywords: [word document, docx, pdf, report, memo, tài liệu, văn bản, báo cáo, hợp đồng, biên bản]
+    spreadsheet:
+      extensions: [xlsx, xls, xlsm, csv, ods]
+      keywords: [spreadsheet, excel, xlsx, csv, bảng tính, openpyxl, pandas]
+    slides:
+      extensions: [pptx, ppt, potx, key]
+      keywords: [powerpoint, pptx, slide deck, slides, presentation, bài thuyết trình, python-pptx]
+    image:
+      extensions: [png, jpg, jpeg, webp, gif]
+      keywords: [image generation, generate image, illustration, poster, thumbnail, infographic, hình ảnh, ảnh]
+    diagram-chart:
+      extensions: [mmd, puml, drawio]
+      keywords: [mermaid, plantuml, diagram, flowchart, chart, graph, matplotlib, sơ đồ, biểu đồ]
+    code:
+      extensions: [py, js, ts, tsx, jsx, go, rs, java, cs, rb, php, sh]
+      keywords: [source code, pytest, unit test, refactor, code review, api, sdk, compiler, lập trình, mã nguồn]
+    dashboard:
+      extensions: [html]
+      keywords: [dashboard, bảng điều khiển, kpi, power bi, grafana, tableau]
+    video:
+      extensions: [mp4, mov, webm, mkv]
+      keywords: [video, remotion, ffmpeg, animation, subtitle, phụ đề]
+    prompt:
+      extensions: []
+      keywords: [prompt, system prompt, prompt template, persona, chat template, lời nhắc]
+  ecosystems:
+    github: {keywords: [github, github actions, gh cli, pull request, api.github.com]}
+    gitlab: {keywords: [gitlab, merge request, gitlab ci]}
+    azure-devops: {keywords: [azure devops, azure pipelines, azure boards, dev.azure.com]}
+    jira: {keywords: [jira, atlassian.net]}
+    confluence: {keywords: [confluence]}
+    teams: {keywords: [microsoft teams, ms teams, teams channel, teams webhook]}
+    sharepoint: {keywords: [sharepoint, onedrive]}
+    outlook: {keywords: [outlook, microsoft graph mail, email inbox, hộp thư]}
+    notion: {keywords: [notion, notion.so]}
+    figma: {keywords: [figma, figma.com]}
+    slack: {keywords: [slack, slack webhook, slack channel]}
+  # Danh mục (slug trong bảng categories). Keyword khớp nhiều nhất thắng; dưới ngưỡng thì không gợi ý.
+  categories:
+    bao-cao-tai-lieu: [report, documentation, docx, pdf, memo, minutes, báo cáo, tài liệu, biên bản, văn bản]
+    du-lieu-phan-tich: [data analysis, analytics, spreadsheet, excel, pandas, sql, statistics, dashboard, phân tích, dữ liệu]
+    lap-trinh: [code, coding, pytest, unit test, refactor, debug, compiler, developer, programming, lập trình, kiểm thử]
+    tu-dong-hoa: [automation, automate, workflow, pipeline, deploy, ci/cd, cron, scheduler, tự động hoá, triển khai]
+    noi-dung-truyen-thong: [content, copywriting, blog, article, social media, video, image, seo, nội dung, truyền thông]
+    nang-suat-van-phong: [productivity, calendar, meeting, email, to-do, notes, schedule, năng suất, lịch họp, ghi chú]
+    marketing-ban-hang: [marketing, sales, campaign, crm, lead, e-commerce, advertising, bán hàng, quảng cáo, khách hàng]
+    nhan-su: [hr, recruitment, recruiting, onboarding, resume, cv, payroll, nhân sự, tuyển dụng]
+    tai-chinh-phap-che: [finance, accounting, invoice, budget, tax, legal, contract, compliance, tài chính, kế toán, pháp chế, hợp đồng]

@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Skill Marketplace",
+    "name": "Vita-skill",
     "tagline": "Tìm, cài và cập nhật skill dùng chung trong công ty"
   },
   "nav": {
@@ -82,7 +82,9 @@
     "reset": "Xóa bộ lọc",
     "results": "{{count}} kết quả",
     "noResults": "Không có skill nào khớp bộ lọc.",
-    "page": "Trang {{page}}"
+    "page": "Trang {{page}}",
+    "outputType": "Loại đầu ra",
+    "ecosystem": "Ứng dụng"
   },
   "detail": {
     "back": "Quay lại",
@@ -204,6 +206,8 @@
     "deleteDraftMessage": "Phiên bản nháp và gói đã tải lên sẽ bị xóa. Thao tác này không hoàn tác được.",
     "name": "Tên skill",
     "fromPackage": "Điền sẵn từ SKILL.md trong gói",
+    "autoSuggested": "Tự động gợi ý, hãy kiểm tra lại",
+    "useNameSuggestion": "Dùng gợi ý: {{name}}",
     "summary": "Mô tả ngắn",
     "summaryMax": "Tối đa 200 ký tự",
     "category": "Danh mục",
@@ -228,13 +232,24 @@
     "previewCard": "Thẻ skill khi hiển thị",
     "previewNote": "Kết quả xem trước chỉ để tham khảo; lúc gửi duyệt, kiểm tra sẽ chạy lại chính thức.",
     "submit": "Gửi duyệt",
-    "submitFailed": "Kiểm tra tự động phát hiện lỗi khi gửi duyệt. Hãy sửa gói rồi thử lại."
+    "submitFailed": "Kiểm tra tự động phát hiện lỗi khi gửi duyệt. Hãy sửa gói rồi thử lại.",
+    "outputTypes": "Loại đầu ra",
+    "outputTypesHelp": "Skill tạo ra loại sản phẩm gì (chọn nhiều)",
+    "ecosystems": "Ứng dụng liên quan",
+    "ecosystemsHelp": "Tuỳ chọn: ứng dụng skill làm việc cùng"
   },
   "common": {
     "cancel": "Hủy",
     "close": "Đóng"
   },
   "reviews": {
+    "classifyTitle": "Phân loại",
+    "classifySave": "Lưu phân loại",
+    "classifyAuto": "Phân loại tự động",
+    "classifyAutoForce": "Phân loại tự động (ghi đè)",
+    "classifySaved": "Đã lưu phân loại.",
+    "classifyNone": "Bộ phân loại không có gợi ý nào.",
+    "classifyAutoDone": "Đã áp dụng gợi ý tự động.",
     "title": "Duyệt",
     "tabQueue": "Việc cần duyệt",
     "tabHistory": "Lịch sử của tôi",
@@ -279,7 +294,15 @@
     "managerReadOnly": "Manager chỉ xem; quyết định do Reviewer được giao thực hiện.",
     "visibilityTitle": "Mở rộng phạm vi xem: {{name}}",
     "currentScope": "Hiện tại",
-    "requestedScope": "Đề nghị"
+    "requestedScope": "Đề nghị",
+    "openFullPage": "Mở trang riêng",
+    "pickedCount": "Đã tick {{count}} skill",
+    "quickApprove": "Duyệt nhanh {{count}} skill",
+    "quickApproveWarn": "Các skill này sẽ được duyệt và đăng ngay, không xem chi tiết. Chỉ dùng cho skill bạn đã tin cậy; skill cần từ chối hoặc góp ý hãy mở ra xem.",
+    "confirmApprove": "Duyệt",
+    "bulkApproved": "Đã duyệt {{count}} skill",
+    "bulkApprovePartial": "Duyệt được {{ok}}/{{total}} skill; phần còn lại cần mở ra xem (có thể đã đổi trạng thái hoặc gói bị thay đổi)",
+    "openDecision": "Gửi yêu cầu"
   },
   "admin": {
     "tab": {
@@ -407,6 +430,8 @@
       "lastScan": "Quét lần cuối {{time}}",
       "neverScanned": "Chưa quét",
       "scanDone": "Quét xong — {{counts}}",
+      "progress": "Đã xử lý {{done}}/{{total}} skill",
+      "progressListing": "Đang liệt kê file trong repo…",
       "historyTitle": "Lịch sử quét — {{name}}",
       "noScans": "Chưa có lần quét nào.",
       "outcome": {
@@ -416,10 +441,48 @@
         "skipped": "Bỏ qua",
         "error": "Lỗi",
         "upstream_changed": "Nguồn đổi trạng thái"
-      }
+      },
+      "categoryAuto": "Tự động (phân loại theo nội dung)",
+      "categoryAutoHelp": "Danh mục được chọn theo nội dung từng skill khi thu thập; skill không khớp sẽ để trống danh mục."
     },
     "actionEdit": "Sửa thông tin",
     "editTitle": "Sửa thông tin hiển thị “{{name}}”",
-    "editInfo": "Chỉ sửa được thông tin hiển thị; nội dung gói đến từ nguồn và không sửa được."
+    "editInfo": "Chỉ sửa được thông tin hiển thị; nội dung gói đến từ nguồn và không sửa được.",
+    "pickReviewer": "Chọn người duyệt, rồi tick các skill muốn giao",
+    "selectAll": "Chọn tất cả ({{count}})",
+    "selectItem": "Chọn {{name}}",
+    "selectedFor": "Đã chọn {{count}} việc · giao cho {{name}}",
+    "selectedNoReviewer": "Đã chọn {{count}} việc · hãy chọn người duyệt ở trên",
+    "clearSelection": "Bỏ chọn",
+    "assignN": "Giao {{count}} việc",
+    "unassignN": "Bỏ giao {{count}} việc",
+    "bulkDone": "Đã giao {{count}} việc cho {{name}}",
+    "bulkPartial": "{{failed}}/{{total}} việc không giao được (có thể đã được duyệt hoặc không còn chờ)"
+  },
+  "taxonomy": {
+    "output": {
+      "document": "Tài liệu",
+      "spreadsheet": "Bảng tính",
+      "slides": "Slide",
+      "image": "Hình ảnh",
+      "diagram-chart": "Sơ đồ & biểu đồ",
+      "code": "Mã nguồn",
+      "dashboard": "Dashboard",
+      "video": "Video",
+      "prompt": "Prompt"
+    },
+    "ecosystem": {
+      "github": "GitHub",
+      "gitlab": "GitLab",
+      "azure-devops": "Azure DevOps",
+      "jira": "Jira",
+      "confluence": "Confluence",
+      "teams": "Microsoft Teams",
+      "sharepoint": "SharePoint",
+      "outlook": "Outlook",
+      "notion": "Notion",
+      "figma": "Figma",
+      "slack": "Slack"
+    }
   }
 }

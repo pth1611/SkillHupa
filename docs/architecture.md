@@ -1,6 +1,6 @@
-# Kiến trúc – Skill Marketplace nội bộ
+# Kiến trúc – Vita-skill nội bộ
 
-> Trạng thái: **thiết kế mục tiêu.** Các file trong `backend/` hiện mới là khung rỗng và `frontend/` chưa được tạo; tài liệu này mô tả cấu trúc và cách các phần sẽ nối với nhau. Yêu cầu nghiệp vụ xem `website/PLAN.md` (bản cũ trong git history). Danh sách API xem [api.md](api.md).
+> Trạng thái: backend, frontend và CLI đã có theo thiết kế này (xem README); phần chưa kiểm chứng trên hạ tầng thật nằm ở README, mục "Còn lại". Yêu cầu nghiệp vụ gốc xem `website/PLAN.md` (đã xoá, còn trong git history). Danh sách API xem [api.md](api.md).
 
 ## 0. Các quyết định đã chốt
 
@@ -57,6 +57,9 @@
 | D49 | Phiên bản từ nguồn | Dùng **tag/release semver** nếu có; không thì **mã commit** để sinh số nội bộ `0.0.N` | `skill_versions.source_ref`, `source_commit`; vẫn tuân quy tắc semver D8 |
 | D50 | Giấy phép | **Chỉ nhập khi giấy phép nằm trong danh sách cho phép** (MIT, Apache-2.0, BSD...) | Danh sách cấu hình trong repo; hiển thị giấy phép và nguồn trên trang skill |
 | D51 | Nguồn thay đổi | Nguồn gốc bị xoá/đổi giấy phép/đóng → **giữ bản đã duyệt, cảnh báo Manager** quyết định gỡ | `skills.upstream_status`; hiện trên bảng điều khiển quản trị |
+| D52 | Phân loại theo loại đầu ra và ứng dụng | Ngoài danh mục (một) và tag, mỗi skill có **loại đầu ra** (Document, Spreadsheet, Slides, Image, Diagram/Chart, Code, Dashboard, Video, Prompt; chọn nhiều) và **ứng dụng** liên quan (GitHub, Jira, Teams…; chọn nhiều, tuỳ chọn). Hai danh sách **đóng**, nằm ở file cấu hình trong repo, không cần Manager duyệt như tag | Bảng `skill_facets(skill_id, kind, slug)`; `taxonomy.yaml`; nhãn hiển thị ở i18n frontend; học theo bố cục lọc của marketplace Qoder |
+| D53 | Bộ lọc và số đếm | Nhiều giá trị **cùng chiều** khớp theo OR, **khác chiều** khớp theo AND. Mỗi giá trị hiện **số skill khớp** nếu chọn thêm, tính trên tập đã lọc theo mọi chiều khác và đã áp phạm vi xem (D19); giá trị có số đếm 0 thì ẩn | `GET /api/skills/facets`; tham số `output_type`, `ecosystem` (lặp được) trên `GET /api/skills`; số đếm không lộ sự tồn tại của skill phòng ban |
+| D54 | Danh mục | Danh mục là **lĩnh vực nghiệp vụ** (skill làm việc gì), tách khỏi phòng ban (ai sở hữu); mở rộng từ 6 lên 10 giá trị | Migration `0007` thêm Năng suất & văn phòng, Marketing & bán hàng, Nhân sự, Tài chính & pháp chế; giữ nguyên danh mục cũ để không đổi dữ liệu đã gán |
 
 ## 1. Tổng quan
 
@@ -193,6 +196,7 @@ erDiagram
     SKILL_SOURCE ||--o{ SKILL : "thu thập ra"
     SKILL ||--|{ SKILL_VERSION : "có"
     SKILL ||--o{ VISIBILITY_REQUEST : "yêu cầu đổi phạm vi"
+    SKILL ||--o{ SKILL_FACET : "loại đầu ra, ứng dụng"
     SKILL ||--o{ SKILL_TAG : "gắn"
     TAG ||--o{ SKILL_TAG : "được gắn"
     SKILL_VERSION ||--o{ SKILL_VERSION_FILE : "gồm file"
@@ -254,6 +258,11 @@ erDiagram
         int proposed_by "creator đề xuất, null nếu do manager tạo"
         int decided_by
         datetime decided_at
+    }
+    SKILL_FACET {
+        int skill_id
+        string kind "output_type|ecosystem"
+        string slug "thuộc taxonomy.yaml"
     }
     SKILL_TAG {
         int skill_id
@@ -436,7 +445,10 @@ Mỗi chuyển trạng thái do service thực hiện, đồng thời ghi `audit
 
 ### Phân loại & tìm kiếm (D7, D30)
 
-- Mỗi skill có đúng 1 **danh mục**, 1 **phòng ban**, và 0–N **tag** (tối đa khoảng 10).
+- Mỗi skill có đúng 1 **danh mục**, 1 **phòng ban**, 0–N **loại đầu ra**, 0–N **ứng dụng** (D52) và 0–N **tag** (tối đa khoảng 10).
+- **Loại đầu ra** và **ứng dụng** là danh sách đóng trong `backend/app/modules/skills/taxonomy.yaml`: Creator chỉ chọn, giá trị lạ bị từ chối (`400 UNKNOWN_CLASSIFICATION`). Đổi danh sách là sửa file qua pull request, không có màn hình quản trị. Nhãn tiếng Việt/Anh nằm ở khoá `taxonomy.output.*`, `taxonomy.ecosystem.*` của frontend; thiếu bản dịch thì hiện chính slug.
+- Cả hai trường **không bắt buộc** khi gửi duyệt (khác `category_id`), nên skill chưa phân loại vẫn đăng được, chỉ không xuất hiện khi lọc theo chiều đó. Manager sửa được cho skill thu thập qua `PATCH /api/admin/skills/{id}`.
+- **Lọc và số đếm (D53):** trong một chiều chọn nhiều giá trị thì khớp một trong số đó (OR); giữa các chiều thì phải khớp cả (AND). `GET /api/skills/facets` nhận cùng bộ lọc với `GET /api/skills` và trả số skill khớp cho từng giá trị của danh mục, loại đầu ra, ứng dụng; mỗi chiều bỏ chính bộ lọc của nó khi đếm để người dùng thấy chọn thêm giá trị khác còn bao nhiêu kết quả. Số đếm áp phạm vi xem (D19).
 - **Tag lấy từ danh sách đã duyệt (`approved`)**. Form tạo skill gợi ý và cho chọn từ danh sách; gõ để lọc.
 - Creator không tìm thấy tag phù hợp thì **đề xuất tag mới**: tag được tạo với trạng thái `pending`, gắn tạm vào skill, và chờ Manager duyệt.
 
@@ -1099,7 +1111,7 @@ flowchart TB
 ## 12. Điểm còn mở
 
 1. **Tên nhóm Entra** thực tế và ai quản lý các nhóm (cần IT/Manager xác nhận); chọn cách phát nhóm trong token (mục 4).
-2. **Cần thêm module**: `notifications`, `audit` chưa có trong khung thư mục.
+2. ~~Cần thêm module `notifications`, `audit`~~: đã có.
 3. **Dữ liệu cấu hình lịch**: ngày mốc thứ bảy làm việc và danh sách ngày lễ năm đầu tiên cần được cung cấp (D31).
 4. **Bộ quy tắc khởi đầu** (mục 7): cần người phụ trách bảo mật xem lại và chốt trước khi mở cho Creator.
 5. **vLLM** (`.env` có `VLLM_*`): hiện **không dùng** trong thiết kế; có thể xoá khỏi `.env` hoặc giữ cho tương lai.

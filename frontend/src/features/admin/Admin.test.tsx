@@ -59,7 +59,7 @@ describe('AssignmentsPage', () => {
     expect(map.has(22)).toBe(false)
   })
 
-  it('hiện tải việc, đưa việc quá hạn lên đầu và giao việc', async () => {
+  it('hiện tải việc, đưa việc quá hạn lên đầu; chọn người rồi tick nhiều skill để giao', async () => {
     const { calls } = mockApi({
       ...base,
       '/api/reviews/queue': () => ({
@@ -71,7 +71,10 @@ describe('AssignmentsPage', () => {
         total: 3, page: 1, page_size: 100,
       }),
       '/api/users': () => reviewers,
-      '/api/reviews/versions/2/assignment': () => new Response(null, { status: 204 }),
+      '/api/reviews/assignments': () => [
+        { kind: 'version', id: 2, error: null },
+        { kind: 'version', id: 1, error: null },
+      ],
       '/api/admin/dashboard': () => dashboard(),
     })
     renderApp('/admin/assignments')
@@ -80,17 +83,21 @@ describe('AssignmentsPage', () => {
     const names = screen.getAllByRole('link').map((l) => l.textContent).filter((n) => ['Bình thường', 'Quá hạn', 'Đã giao'].includes(n ?? ''))
     expect(names[0]).toBe('Quá hạn')
 
-    const select = screen.getByRole('combobox', { name: 'Giao việc Quá hạn cho' })
-    await userEvent.click(select)
-    await userEvent.click(await screen.findByRole('option', { name: 'Chi (0)' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Chi: 0 việc' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Chọn Quá hạn' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Chọn Bình thường' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Giao 2 việc' }))
     await waitFor(() => {
-      const call = calls.find((c) => c.url.pathname === '/api/reviews/versions/2/assignment')!
+      const call = calls.find((c) => c.url.pathname === '/api/reviews/assignments')!
       expect(call.init.method).toBe('PUT')
-      expect(JSON.parse(String(call.init.body))).toEqual({ reviewer_id: 22 })
+      expect(JSON.parse(String(call.init.body))).toEqual({
+        reviewer_id: 22,
+        items: [{ kind: 'version', id: 1 }, { kind: 'version', id: 2 }],
+      })
     })
   })
 
-  it('lọc chưa giao theo URL và bỏ giao gọi DELETE', async () => {
+  it('lọc đã giao theo URL và bỏ giao hàng loạt gọi DELETE', async () => {
     const { calls } = mockApi({
       ...base,
       '/api/reviews/queue': () => ({
@@ -104,8 +111,9 @@ describe('AssignmentsPage', () => {
     renderApp('/admin/assignments?filter=assigned')
     expect(await screen.findByText('Đã giao', { selector: 'a' })).toBeInTheDocument()
     expect(screen.queryByText('Chưa giao', { selector: 'a' })).toBeNull()
-    await userEvent.click(screen.getByRole('combobox', { name: 'Giao việc Đã giao cho' }))
-    await userEvent.click(await screen.findByRole('option', { name: 'Chưa giao' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Bình: 1 việc' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Chọn Đã giao' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Bỏ giao 1 việc' }))
     await waitFor(() => expect(calls.some((c) => c.init.method === 'DELETE' && c.url.pathname === '/api/reviews/versions/3/assignment')).toBe(true))
   })
 })

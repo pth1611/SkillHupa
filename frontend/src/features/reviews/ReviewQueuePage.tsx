@@ -1,12 +1,17 @@
-import { Alert, Box, Button, Card, CardActionArea, Chip, Container, Pagination, Stack, Tab, Tabs, Typography } from '@mui/material'
-import { useQuery } from '@tanstack/react-query'
+import {
+  Alert, Box, Button, Card, CardActionArea, Checkbox, Chip, Container, Dialog, DialogActions, DialogContent, DialogContentText,
+  DialogTitle, FormControlLabel, IconButton, Pagination, Stack, Tab, Tabs, Typography,
+} from '@mui/material'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link as RouterLink, useNavigate } from 'react-router-dom'
-import { fetchHistory, fetchQueue, reviewKeys, type QueueParams } from '../../api/reviews'
+import { Link as RouterLink } from 'react-router-dom'
+import { decideVersion, fetchHistory, fetchQueue, reviewKeys, type QueueParams } from '../../api/reviews'
 import type { QueueItemData } from '../../api/types'
 import { useAuth } from '../../auth/AuthProvider'
 import { EmptyState, ErrorState, LoadingState } from '../../components/StateViews'
+import { ReviewDetailView } from './ReviewDetailPage'
+import { VisibilityReviewView } from './VisibilityReviewPage'
 
 export function waitingDays(iso: string, now = Date.now()): number {
   return Math.max(0, Math.floor((now - new Date(iso).getTime()) / 86_400_000))
@@ -16,13 +21,30 @@ export function itemPath(item: Pick<QueueItemData, 'kind' | 'id'>): string {
   return item.kind === 'version' ? `/reviews/${item.id}` : `/reviews/visibility/${item.id}`
 }
 
-function QueueCard({ item, isManager }: { item: QueueItemData; isManager: boolean }) {
+interface QueueCardProps {
+  item: QueueItemData
+  isManager: boolean
+  checked: boolean
+  onCheck: (on: boolean) => void
+  onOpen: () => void
+}
+
+function QueueCard({ item, isManager, checked, onCheck, onOpen }: QueueCardProps) {
   const { t } = useTranslation()
-  const navigate = useNavigate()
   const days = waitingDays(item.submitted_at)
   return (
-    <Card sx={item.overdue || item.unassigned_overdue ? { borderColor: 'warning.main' } : undefined}>
-      <CardActionArea onClick={() => navigate(itemPath(item))} sx={{ p: 2 }}>
+    <Card sx={{ display: 'flex', alignItems: 'center', ...(item.overdue || item.unassigned_overdue ? { borderColor: 'warning.main' } : {}) }}>
+      {item.kind === 'version' ? (
+        <Checkbox
+          sx={{ ml: 1 }}
+          checked={checked}
+          onChange={(_, on) => onCheck(on)}
+          inputProps={{ 'aria-label': t('admin.selectItem', { name: item.skill_name }) }}
+        />
+      ) : (
+        <Box sx={{ width: 58, flexShrink: 0 }} />
+      )}
+      <CardActionArea onClick={onOpen} sx={{ p: 2, pl: 0.5 }}>
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ rowGap: 0.5 }}>
           <Typography fontWeight={600}>{item.skill_name}</Typography>
           {item.kind === 'version' ? (
@@ -67,6 +89,42 @@ function Queue({ isManager }: { isManager: boolean }) {
   }
   const queue = useQuery({ queryKey: reviewKeys.queue(params), queryFn: () => fetchQueue(params) })
   const pages = Math.max(1, Math.ceil((queue.data?.total ?? 0) / 20))
+  const queryClient = useQueryClient()
+  const [open, setOpen] = useState<Pick<QueueItemData, 'kind' | 'id'> | null>(null)
+  const [picked, setPicked] = useState<Set<number>>(new Set())
+  const [confirming, setConfirming] = useState(false)
+  const [message, setMessage] = useState<{ severity: 'success' | 'error'; text: string } | null>(null)
+  const versionItems = (queue.data?.items ?? []).filter((i) => i.kind === 'version')
+  const allPicked = versionItems.length > 0 && versionItems.every((i) => picked.has(i.id))
+
+  const approveMany = useMutation({
+    mutationFn: async (ids: number[]) => {
+      const results = await Promise.allSettled(ids.map((id) => decideVersion(id, 'approved', null)))
+      return { ok: results.filter((r) => r.status === 'fulfilled').length, total: ids.length }
+    },
+    onSuccess: ({ ok, total }) => {
+      setConfirming(false)
+      setPicked(new Set())
+      setMessage(
+        ok === total
+          ? { severity: 'success', text: t('reviews.bulkApproved', { count: ok }) }
+          : { severity: 'error', text: t('reviews.bulkApprovePartial', { ok, total }) },
+      )
+      void queryClient.invalidateQueries({ queryKey: reviewKeys.all })
+    },
+  })
+  function togglePick(id: number, on: boolean) {
+    setPicked((prev) => {
+      const next = new Set(prev)
+      if (on) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }
+  function closeDialog() {
+    setOpen(null)
+    void queryClient.invalidateQueries({ queryKey: reviewKeys.all })
+  }
 
   return (
     <Stack spacing={2}>
@@ -94,17 +152,69 @@ function Queue({ isManager }: { isManager: boolean }) {
           />
         )}
       </Stack>
+      {message && <Alert severity={message.severity} onClose={() => setMessage(null)}>{message.text}</Alert>}
       {queue.isPending && <LoadingState />}
       {queue.isError && <ErrorState onRetry={() => void queue.refetch()} />}
       {queue.data?.items.length === 0 && <EmptyState>{t('reviews.queueEmpty')}</EmptyState>}
+      {versionItems.length > 0 && (
+        <FormControlLabel
+          control={
+            <Checkbox
+              size="small"
+              checked={allPicked}
+              onChange={(_, on) => setPicked(on ? new Set(versionItems.map((i) => i.id)) : new Set())}
+            />
+          }
+          label={t('admin.selectAll', { count: versionItems.length })}
+        />
+      )}
       <Stack spacing={1.5} component="ul" sx={{ listStyle: 'none', p: 0, m: 0 }}>
         {queue.data?.items.map((item) => (
           <li key={`${item.kind}-${item.id}`}>
-            <QueueCard item={item} isManager={isManager} />
+            <QueueCard
+              item={item}
+              isManager={isManager}
+              checked={picked.has(item.id)}
+              onCheck={(on) => togglePick(item.id, on)}
+              onOpen={() => setOpen({ kind: item.kind, id: item.id })}
+            />
           </li>
         ))}
       </Stack>
       {pages > 1 && <Pagination sx={{ alignSelf: 'center' }} count={pages} page={page} onChange={(_, p) => setPage(p)} />}
+
+      {picked.size > 0 && (
+        <Card elevation={4} sx={{ position: 'sticky', bottom: 16, p: 1.5, display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Typography sx={{ flexGrow: 1 }}>{t('reviews.pickedCount', { count: picked.size })}</Typography>
+          <Button size="small" onClick={() => setPicked(new Set())}>{t('admin.clearSelection')}</Button>
+          <Button variant="contained" color="success" onClick={() => setConfirming(true)}>
+            {t('reviews.quickApprove', { count: picked.size })}
+          </Button>
+        </Card>
+      )}
+
+      <Dialog open={confirming} onClose={() => !approveMany.isPending && setConfirming(false)}>
+        <DialogTitle>{t('reviews.quickApprove', { count: picked.size })}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>{t('reviews.quickApproveWarn')}</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={approveMany.isPending} onClick={() => setConfirming(false)}>{t('common.cancel')}</Button>
+          <Button variant="contained" color="success" disabled={approveMany.isPending} onClick={() => approveMany.mutate([...picked])}>
+            {t('reviews.confirmApprove')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={open !== null} onClose={closeDialog} fullWidth maxWidth="xl" scroll="paper">
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', px: 1, pt: 1 }}>
+          <IconButton aria-label={t('common.close')} onClick={closeDialog}>✕</IconButton>
+        </Box>
+        <DialogContent>
+          {open?.kind === 'version' && <ReviewDetailView embedded id={open.id} onDecided={closeDialog} />}
+          {open?.kind === 'visibility' && <VisibilityReviewView embedded id={open.id} onDecided={closeDialog} />}
+        </DialogContent>
+      </Dialog>
     </Stack>
   )
 }
@@ -167,13 +277,13 @@ export function ReviewQueuePage() {
             {t('reviews.managerNote')}
           </Alert>
         )}
-        {!isManager && (
+        {(
           <Tabs value={tab} onChange={(_, v: 'queue' | 'history') => setTab(v)}>
             <Tab value="queue" label={t('reviews.tabQueue')} />
             <Tab value="history" label={t('reviews.tabHistory')} />
           </Tabs>
         )}
-        {tab === 'queue' || isManager ? <Queue isManager={isManager} /> : <History />}
+        {tab === 'queue' ? <Queue isManager={isManager} /> : <History />}
       </Stack>
     </Container>
   )

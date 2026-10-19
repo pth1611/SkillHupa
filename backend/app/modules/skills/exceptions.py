@@ -54,3 +54,9 @@ class UnknownDepartment(AppError):
     status_code = 400
     code = "UNKNOWN_DEPARTMENT"
     message = "Phòng ban không thuộc danh sách chuẩn"
+
+
+class UnknownClassification(AppError):
+    status_code = 400
+    code = "UNKNOWN_CLASSIFICATION"
+    message = "Loại đầu ra hoặc ứng dụng không thuộc danh sách cho phép"

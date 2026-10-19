@@ -231,9 +231,9 @@ def test_cannot_decide_twice_or_unassigned(w):
     assert w.decide(w.reviewer, vid, "approved").status_code == 409
 
 
-def test_manager_cannot_decide(w):
+def test_manager_can_decide(w):
     _, vid, _ = w.submit()
-    assert w.decide(w.manager, vid, "approved").status_code == 403
+    assert w.decide(w.manager, vid, "approved").status_code == 204
 
 
 def test_checksum_mismatch_blocks_approval(w):
@@ -513,3 +513,27 @@ def test_review_detail_has_owner_assigner_and_icon_endpoint(w):
     assert d["has_icon"] is True and d["owner_name"] and d["assigned_by_name"]
     img = w.reviewer.get(f"/api/reviews/versions/{vid}/icon")
     assert img.status_code == 200 and img.headers["content-type"] == "image/webp"
+
+
+def test_bulk_assign_gives_many_and_skips_failures(w):
+    _, v1, _ = w.submit()
+    _, v2, _ = w.submit(name_suffix=" 2")
+    r = w.manager.put(
+        "/api/reviews/assignments",
+        json={"reviewer_id": w.ids["reviewer"],
+              "items": [{"kind": "version", "id": v1}, {"kind": "version", "id": v2}, {"kind": "version", "id": 99999}]},
+        headers=csrf_headers(w.manager),
+    )
+    assert r.status_code == 200, r.text
+    errors = {i["id"]: i["error"] for i in r.json()}
+    assert errors == {v1: None, v2: None, 99999: "REVIEW_ITEM_NOT_FOUND"}
+    assert w.decide(w.reviewer, v1, "approved").status_code == 204
+    assert w.decide(w.reviewer, v2, "approved").status_code == 204
+
+
+def test_bulk_assign_rejects_non_reviewer_and_non_manager(w):
+    _, v1, _ = w.submit()
+    body = {"reviewer_id": w.ids["creator"], "items": [{"kind": "version", "id": v1}]}
+    assert w.manager.put("/api/reviews/assignments", json=body, headers=csrf_headers(w.manager)).status_code == 422
+    body["reviewer_id"] = w.ids["reviewer"]
+    assert w.reviewer.put("/api/reviews/assignments", json=body, headers=csrf_headers(w.reviewer)).status_code == 403

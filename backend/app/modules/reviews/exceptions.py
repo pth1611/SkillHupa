@@ -20,7 +20,7 @@ class CommentRequired(AppError):
 class InvalidAssignee(AppError):
     status_code = 422
     code = "INVALID_ASSIGNEE"
-    message = "Người được giao phải là Reviewer đang hoạt động"
+    message = "Người được giao phải là Reviewer hoặc Manager đang hoạt động"
 
 
 class VisibilityRequestExists(Conflict):

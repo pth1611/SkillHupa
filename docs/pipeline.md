@@ -1,4 +1,4 @@
-# Pipeline – Skill Marketplace
+# Pipeline – Vita-skill
 
 > Trạng thái: **đề xuất.** Repo chưa có CI/CD (không có `.github/`); phần 2–3 là thiết kế mục tiêu dựa trên `Makefile`, `docker-compose` và `deploy/` đã dựng khung.
 

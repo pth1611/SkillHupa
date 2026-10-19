@@ -20,7 +20,7 @@ $(PY):
 install: $(PY) ## Tạo venv và cài thư viện backend
 
 .PHONY: dev
-dev: $(PY) ## Chạy API với tự nạp lại (cần backend/.env và PostgreSQL, xem `make db`)
+dev: $(PY) ## Chạy API với tự nạp lại (cần .env và PostgreSQL, xem `make db`)
 	cd $(BACKEND) && .venv/bin/python -m uvicorn app.main:app --reload --port 8000
 
 .PHONY: test
@@ -36,7 +36,7 @@ fix: $(PY) ## Ruff tự sửa lỗi sửa được
 	cd $(BACKEND) && .venv/bin/ruff check . --exclude .venv --fix
 
 .PHONY: migrate
-migrate: $(PY) ## Áp dụng migration lên cơ sở dữ liệu trong backend/.env
+migrate: $(PY) ## Áp dụng migration lên cơ sở dữ liệu trong .env
 	cd $(BACKEND) && .venv/bin/alembic upgrade head
 
 .PHONY: migration
@@ -44,9 +44,20 @@ migration: $(PY) ## Sinh migration từ model: make migration m="mo ta"
 	@test -n "$(m)" || (echo 'Dùng: make migration m="mô tả"'; exit 1)
 	cd $(BACKEND) && .venv/bin/alembic revision --autogenerate -m "$(m)"
 
+.PHONY: classify-backfill
+classify-backfill: $(PY) ## Gợi ý phân loại cho skill cũ: make classify-backfill [args="--dry-run --refresh"]
+	cd $(BACKEND) && .venv/bin/python -m app.jobs.backfill_classification $(args)
+
 .PHONY: job
 job: $(PY) ## Chạy tác vụ định kỳ một lần (nhắc việc, tự chia việc, quét nguồn)
 	cd $(BACKEND) && .venv/bin/python -m app.jobs.scheduled
+
+.PHONY: env
+env: ## Tạo .env từ .env.example, tự sinh SESSION_SECRET (không ghi đè nếu .env đã có)
+	@if [ -f .env ]; then echo ".env đã có, giữ nguyên"; else \
+	  cp .env.example .env && \
+	  sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')|" .env && \
+	  echo "Đã tạo .env"; fi
 
 .PHONY: secret
 secret: ## In một SESSION_SECRET ngẫu nhiên

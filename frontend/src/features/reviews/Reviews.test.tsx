@@ -19,7 +19,7 @@ const detail = (over: Partial<ReviewDetailData> = {}): ReviewDetailData => ({
   version_id: 11, version: '1.3.0', status: 'pending', skill_id: 5, skill_name: 'Báo cáo', summary: 'Tóm tắt',
   origin: 'internal', department: 'Kế toán', visibility: 'company', changelog: 'Sửa lỗi', skill_md: '# Hướng dẫn',
   submitted_at: new Date(Date.now() - 2 * 86_400_000).toISOString(), assigned_to: 1, assigned_by_name: 'Quản lý',
-  owner_name: 'Lan', has_icon: false, base_version: '1.2.0',
+  owner_name: 'Lan', has_icon: false, base_version: '1.2.0', output_types: [], ecosystems: [],
   validation: [{ check: 'commands.curl', result: 'warn', detail: 'Chạy từ mạng', file_path: 'scripts/install.sh', line: 2 }],
   ...over,
 })
@@ -85,7 +85,34 @@ describe('ReviewQueuePage', () => {
     expect(screen.getByText('Mở rộng phạm vi')).toBeInTheDocument()
     expect(screen.getAllByText('chờ 3 ngày')).toHaveLength(2)
     await userEvent.click(screen.getByText('Báo cáo'))
-    expect(await screen.findByRole('heading', { name: 'Báo cáo', level: 1 })).toBeInTheDocument()
+    const dialog = await screen.findByRole('dialog')
+    expect(await within(dialog).findByRole('heading', { name: 'Báo cáo', level: 1 })).toBeInTheDocument()
+    expect(within(dialog).getByRole('link', { name: 'Mở trang riêng' })).toHaveAttribute('href', '/reviews/11')
+    expect(within(dialog).queryByRole('link', { name: /Quay lại/ })).toBeNull()
+  })
+
+  it('tick nhiều skill rồi duyệt nhanh, gọi decision cho từng skill', async () => {
+    const { calls } = mockApi({
+      '/api/auth/me': () => me('reviewer'),
+      '/api/reviews/queue': () => ({
+        items: [queueItem({ id: 11, skill_name: 'Skill một' }), queueItem({ id: 12, skill_name: 'Skill hai' })],
+        total: 2, page: 1, page_size: 20,
+      }),
+      '/api/reviews/versions/11/decision': () => new Response(null, { status: 204 }),
+      '/api/reviews/versions/12/decision': () => new Response(null, { status: 204 }),
+    })
+    renderApp('/reviews')
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Chọn Skill một' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Chọn Skill hai' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Duyệt nhanh 2 skill' }))
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Duyệt' }))
+    await waitFor(() => {
+      for (const id of [11, 12]) {
+        const call = calls.find((c) => c.url.pathname === `/api/reviews/versions/${id}/decision`)!
+        expect(JSON.parse(String(call.init.body))).toEqual({ decision: 'approved', comment: null })
+      }
+    })
+    expect(await screen.findByText('Đã duyệt 2 skill')).toBeInTheDocument()
   })
 
   it('Manager thấy người được giao, bộ lọc chưa giao và liên kết phân công', async () => {
@@ -168,6 +195,7 @@ describe('ReviewDetailPage', () => {
       }),
     )
     renderApp('/reviews/11')
+    await userEvent.click(await screen.findByRole('button', { name: 'Gửi yêu cầu' }))
     await userEvent.click(await screen.findByRole('radio', { name: 'Từ chối' }))
     await userEvent.click(screen.getByRole('button', { name: 'Gửi quyết định' }))
     expect(await screen.findByText('Cần nêu góp ý khi từ chối.')).toBeInTheDocument()
@@ -190,15 +218,16 @@ describe('ReviewDetailPage', () => {
       }),
     )
     renderApp('/reviews/11')
+    await userEvent.click(await screen.findByRole('button', { name: 'Gửi yêu cầu' }))
     await userEvent.click(await screen.findByRole('button', { name: 'Gửi quyết định' }))
     expect(await screen.findByText('Gói đã bị thay đổi')).toBeInTheDocument()
   })
 
-  it('Manager chỉ xem, không có khung quyết định', async () => {
+  it('Manager cũng có khung quyết định', async () => {
     mockApi(detailRoutes('manager'))
     renderApp('/reviews/11')
-    expect(await screen.findByText(/Manager chỉ xem/)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Gửi quyết định' })).toBeNull()
+    await userEvent.click(await screen.findByRole('button', { name: 'Gửi yêu cầu' }))
+    expect(await screen.findByRole('button', { name: 'Gửi quyết định' })).toBeInTheDocument()
   })
 
   it('việc không được giao trả 404', async () => {
@@ -229,6 +258,7 @@ describe('VisibilityReviewPage', () => {
     const card = (await screen.findByText(/Hiện tại/)).closest('.MuiCard-root') as HTMLElement
     expect(within(card).getByText('Phòng ban Kế toán')).toBeInTheDocument()
     expect(within(card).getByText('Toàn công ty')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Gửi yêu cầu' }))
     await userEvent.click(screen.getByRole('button', { name: 'Gửi quyết định' }))
     await waitFor(() => expect(calls.some((c) => c.url.pathname.endsWith('/decision'))).toBe(true))
   })

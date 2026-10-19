@@ -1,16 +1,18 @@
 import {
-  Autocomplete, Box, Button, Chip, Container, MenuItem, Pagination, Stack, TextField, Typography,
+  Autocomplete, Box, Button, Checkbox, Chip, Container, FormControlLabel, FormGroup, MenuItem, Pagination, Stack,
+  TextField, Typography,
 } from '@mui/material'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import {
-  fetchCategories, fetchDepartments, fetchTags, searchSkills, skillKeys, type SkillQuery,
+  fetchCategories, fetchDepartments, fetchFacets, fetchTags, fetchTaxonomy, searchSkills, skillKeys, type SkillQuery,
 } from '../../api/skills'
 import type { SkillSort } from '../../api/types'
 import { SkillGrid } from '../../components/SkillCard'
 import { EmptyState, ErrorState, LoadingState } from '../../components/StateViews'
+import { taxonomyLabel } from '../../utils/taxonomy'
 
 const PAGE_SIZE = 12
 const SORTS: SkillSort[] = ['newest', 'popular', 'name']
@@ -24,6 +26,8 @@ function parseQuery(params: URLSearchParams): SkillQuery {
     category: Number.isInteger(category) && category > 0 ? category : undefined,
     department: params.get('department') ?? undefined,
     tag: params.getAll('tag'),
+    output_type: params.getAll('output_type'),
+    ecosystem: params.getAll('ecosystem'),
     sort: sort && SORTS.includes(sort) ? sort : 'newest',
     page: Number.isInteger(page) && page > 0 ? page : 1,
     page_size: PAGE_SIZE,
@@ -40,6 +44,8 @@ export function SearchPage() {
   const categories = useQuery({ queryKey: skillKeys.categories, queryFn: fetchCategories })
   const departments = useQuery({ queryKey: skillKeys.departments, queryFn: fetchDepartments })
   const tags = useQuery({ queryKey: skillKeys.tags(''), queryFn: () => fetchTags('') })
+  const taxonomy = useQuery({ queryKey: skillKeys.taxonomy, queryFn: fetchTaxonomy })
+  const facets = useQuery({ queryKey: skillKeys.facets(query), queryFn: () => fetchFacets(query) })
   const results = useQuery({ queryKey: skillKeys.search(query), queryFn: () => searchSkills(query) })
 
   /** Cập nhật URL (nguồn sự thật của bộ lọc); đổi bộ lọc thì về trang 1. */
@@ -61,7 +67,43 @@ export function SearchPage() {
 
   const total = results.data?.total ?? 0
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  const hasFilters = !!(query.q || query.category || query.department || query.tag?.length)
+  const hasFilters = !!(
+    query.q || query.category || query.department || query.tag?.length || query.output_type?.length || query.ecosystem?.length
+  )
+
+  /** Nhóm hộp chọn nhiều giá trị; số đếm cho biết chọn thêm giá trị đó còn bao nhiêu skill. */
+  function facetGroup(param: 'output_type' | 'ecosystem') {
+    const kind = param === 'output_type' ? 'output' : 'ecosystem'
+    const slugs = taxonomy.data?.[param === 'output_type' ? 'output_types' : 'ecosystems'] ?? []
+    const counts = facets.data?.[param === 'output_type' ? 'output_types' : 'ecosystems'] ?? {}
+    const selected = query[param] ?? []
+    // Chỉ hiện giá trị có skill hoặc đang được chọn, tránh một dãy mục "0".
+    const shown = slugs.filter((s) => (counts[s] ?? 0) > 0 || selected.includes(s))
+    if (shown.length === 0) return null
+    return (
+      <Box component="fieldset" sx={{ border: 0, p: 0, m: 0 }}>
+        <Typography component="legend" variant="subtitle2" sx={{ mb: 0.5 }}>
+          {t(param === 'output_type' ? 'search.outputType' : 'search.ecosystem')}
+        </Typography>
+        <FormGroup row>
+          {shown.map((slug) => (
+            <FormControlLabel
+              key={slug}
+              control={
+                <Checkbox
+                  size="small"
+                  checked={selected.includes(slug)}
+                  onChange={(_, on) => update({ [param]: on ? [...selected, slug] : selected.filter((s) => s !== slug) })}
+                />
+              }
+              label={`${taxonomyLabel(t, kind, slug)} (${counts[slug] ?? 0})`}
+              sx={{ mr: 2 }}
+            />
+          ))}
+        </FormGroup>
+      </Box>
+    )
+  }
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
@@ -93,6 +135,7 @@ export function SearchPage() {
             {(categories.data ?? []).map((c) => (
               <MenuItem key={c.id} value={c.id}>
                 {c.name}
+                {facets.data ? ` (${facets.data.categories[c.id] ?? 0})` : ''}
               </MenuItem>
             ))}
           </TextField>
@@ -129,6 +172,10 @@ export function SearchPage() {
             <MenuItem value="popular">{t('search.sortPopular')}</MenuItem>
             <MenuItem value="name">{t('search.sortName')}</MenuItem>
           </TextField>
+          <Stack sx={{ gridColumn: { md: '1 / -1' }, gap: 1.5 }}>
+            {facetGroup('output_type')}
+            {facetGroup('ecosystem')}
+          </Stack>
           <Stack direction="row" spacing={1} sx={{ gridColumn: { md: '1 / -1' } }}>
             <Button type="submit" variant="contained">
               {t('search.apply')}

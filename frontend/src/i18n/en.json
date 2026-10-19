@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Skill Marketplace",
+    "name": "Vita-skill",
     "tagline": "Find, install and update skills shared across the company"
   },
   "nav": {
@@ -82,7 +82,9 @@
     "reset": "Clear filters",
     "results": "{{count}} results",
     "noResults": "No skills match these filters.",
-    "page": "Page {{page}}"
+    "page": "Page {{page}}",
+    "outputType": "Output type",
+    "ecosystem": "Application"
   },
   "detail": {
     "back": "Back",
@@ -204,6 +206,8 @@
     "deleteDraftMessage": "The draft version and its uploaded package will be deleted. This cannot be undone.",
     "name": "Skill name",
     "fromPackage": "Pre-filled from SKILL.md in the package",
+    "autoSuggested": "Auto-suggested, please review",
+    "useNameSuggestion": "Use suggestion: {{name}}",
     "summary": "Short description",
     "summaryMax": "At most 200 characters",
     "category": "Category",
@@ -228,13 +232,24 @@
     "previewCard": "How the skill card will look",
     "previewNote": "The preview result is for reference only; checks run again officially when you submit.",
     "submit": "Submit for review",
-    "submitFailed": "The automatic check found errors on submit. Fix the package and try again."
+    "submitFailed": "The automatic check found errors on submit. Fix the package and try again.",
+    "outputTypes": "Output types",
+    "outputTypesHelp": "What the skill produces (pick several)",
+    "ecosystems": "Related applications",
+    "ecosystemsHelp": "Optional: applications the skill works with"
   },
   "common": {
     "cancel": "Cancel",
     "close": "Close"
   },
   "reviews": {
+    "classifyTitle": "Classification",
+    "classifySave": "Save classification",
+    "classifyAuto": "Auto-classify",
+    "classifyAutoForce": "Auto-classify (overwrite)",
+    "classifySaved": "Classification saved.",
+    "classifyNone": "The classifier found no suggestion.",
+    "classifyAutoDone": "Applied the automatic suggestion.",
     "title": "Reviews",
     "tabQueue": "To review",
     "tabHistory": "My history",
@@ -279,7 +294,15 @@
     "managerReadOnly": "Managers can only view; the assigned Reviewer makes the decision.",
     "visibilityTitle": "Visibility expansion: {{name}}",
     "currentScope": "Current",
-    "requestedScope": "Requested"
+    "requestedScope": "Requested",
+    "openFullPage": "Open full page",
+    "pickedCount": "{{count}} skills ticked",
+    "quickApprove": "Quick approve {{count}}",
+    "quickApproveWarn": "These skills will be approved and published right away without a detailed look. Use it only for skills you already trust; open a skill to reject it or leave feedback.",
+    "confirmApprove": "Approve",
+    "bulkApproved": "Approved {{count}} skills",
+    "bulkApprovePartial": "Approved {{ok}} of {{total}} skills; open the rest to check (they may have changed state or the package was altered)",
+    "openDecision": "Submit request"
   },
   "admin": {
     "tab": {
@@ -407,6 +430,8 @@
       "lastScan": "Last scan {{time}}",
       "neverScanned": "Never scanned",
       "scanDone": "Scan done — {{counts}}",
+      "progress": "Processed {{done}}/{{total}} skills",
+      "progressListing": "Listing files in the repository…",
       "historyTitle": "Scan history — {{name}}",
       "noScans": "No scans yet.",
       "outcome": {
@@ -416,10 +441,48 @@
         "skipped": "Skipped",
         "error": "Error",
         "upstream_changed": "Upstream changed"
-      }
+      },
+      "categoryAuto": "Automatic (classify by content)",
+      "categoryAutoHelp": "The category is chosen from each skill's content when collected; skills that match nothing stay uncategorised."
     },
     "actionEdit": "Edit details",
     "editTitle": "Edit display details of “{{name}}”",
-    "editInfo": "Only display details can be edited; the package content comes from the source and cannot be changed."
+    "editInfo": "Only display details can be edited; the package content comes from the source and cannot be changed.",
+    "pickReviewer": "Pick a reviewer, then tick the skills to give them",
+    "selectAll": "Select all ({{count}})",
+    "selectItem": "Select {{name}}",
+    "selectedFor": "{{count}} selected · assign to {{name}}",
+    "selectedNoReviewer": "{{count}} selected · pick a reviewer above",
+    "clearSelection": "Clear",
+    "assignN": "Assign {{count}}",
+    "unassignN": "Unassign {{count}}",
+    "bulkDone": "Assigned {{count}} items to {{name}}",
+    "bulkPartial": "{{failed}} of {{total}} items could not be assigned (may already be decided)"
+  },
+  "taxonomy": {
+    "output": {
+      "document": "Document",
+      "spreadsheet": "Spreadsheet",
+      "slides": "Slides",
+      "image": "Image",
+      "diagram-chart": "Diagrams & charts",
+      "code": "Code",
+      "dashboard": "Dashboard",
+      "video": "Video",
+      "prompt": "Prompt"
+    },
+    "ecosystem": {
+      "github": "GitHub",
+      "gitlab": "GitLab",
+      "azure-devops": "Azure DevOps",
+      "jira": "Jira",
+      "confluence": "Confluence",
+      "teams": "Microsoft Teams",
+      "sharepoint": "SharePoint",
+      "outlook": "Outlook",
+      "notion": "Notion",
+      "figma": "Figma",
+      "slack": "Slack"
+    }
   }
 }

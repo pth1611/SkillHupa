@@ -19,7 +19,8 @@ class SkillSource(Base):
     url: Mapped[str] = mapped_column(String(1000), unique=True, nullable=False)
     ref: Mapped[str | None] = mapped_column(String(100), nullable=True)
     path_glob: Mapped[str] = mapped_column(String(500), default="", nullable=False)
-    default_category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"), nullable=False)
+    # None = tự động phân loại danh mục khi thu thập
+    default_category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id"), nullable=True)
     default_department: Mapped[str] = mapped_column(String(255), nullable=False)
     default_visibility: Mapped[str] = mapped_column(String(16), default="company", nullable=False)
     credential_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -42,9 +43,10 @@ class SourceScan(Base):
     source_id: Mapped[int] = mapped_column(ForeignKey("skill_sources.id"), index=True, nullable=False)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    status: Mapped[str] = mapped_column(String(8), nullable=False)  # ok|error
+    status: Mapped[str] = mapped_column(String(8), nullable=False)  # running|ok|error
     message: Mapped[str | None] = mapped_column(String(500), nullable=True)
     triggered_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     commit: Mapped[str | None] = mapped_column(String(64), nullable=True)
     counts: Mapped[dict[str, int]] = mapped_column(JSON, default=dict, nullable=False)
     items: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    total: Mapped[int | None] = mapped_column(Integer, nullable=True)  # số thư mục skill cần xử lý

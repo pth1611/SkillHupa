@@ -78,7 +78,15 @@ def test_create_prefills_and_runs_preview(creator):
     resp = upload(creator, good_zip())
     assert resp.status_code == 201, resp.text
     body = resp.json()
-    assert body["prefill"] == {"name": "Báo cáo tuần", "description": "Tạo báo cáo tuần từ dữ liệu", "version": "1.0.0"}
+    assert body["prefill"] == {
+        "name": "Báo cáo tuần",
+        "description": "Tạo báo cáo tuần từ dữ liệu",
+        "version": "1.0.0",
+        "output_types": ["document"],
+        "ecosystems": [],
+        "category_slug": "bao-cao-tai-lieu",
+        "name_suggestion": None,
+    }
     assert body["skill"]["status"] == "draft"
     assert body["skill"]["name"] == "Báo cáo tuần"
     assert body["skill"]["department"] == "Kế toán"

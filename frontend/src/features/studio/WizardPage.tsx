@@ -14,7 +14,7 @@ import { useAuth } from '../../auth/AuthProvider'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { ErrorState, LoadingState } from '../../components/StateViews'
 import { NotFoundPage } from '../common/pages'
-import { InfoStep, type InfoValues } from './InfoStep'
+import { InfoStep, type InfoValues, type Suggested } from './InfoStep'
 import { PackageStep } from './PackageStep'
 import { ReviewStep } from './ReviewStep'
 import { ValidationList } from './ValidationList'
@@ -149,6 +149,8 @@ export function WizardPage() {
           department: values.department,
           visibility: values.visibility,
           tag_ids: values.tag_ids,
+          output_types: values.output_types,
+          ecosystems: values.ecosystems,
         })
       }
       const changed = values.version !== target || values.changelog !== (targetVersion?.changelog ?? '')
@@ -208,13 +210,24 @@ export function WizardPage() {
   const released = allVersions.filter((v) => v.status === 'published' || v.status === 'revoked').map((v) => v.version)
   const prefill = skillId !== null && target ? queryClient.getQueryData<Prefill>(prefillKey(skillId, target)) : undefined
 
+  const suggestedCategoryId =
+    skill?.category_id == null ? (categories.data?.find((c) => c.slug === prefill?.category_slug)?.id ?? null) : null
+  const suggested: Suggested = {
+    name: prefill?.name_suggestion ?? null,
+    category_id: suggestedCategoryId,
+    output_types: skill?.output_types?.length ? (skill.auto_output_types ?? []) : (prefill?.output_types ?? []),
+    ecosystems: skill?.ecosystems?.length ? (skill.auto_ecosystems ?? []) : (prefill?.ecosystems ?? []),
+  }
+
   const defaults: InfoValues = {
     name: skill && skill.name !== 'Chưa đặt tên' ? skill.name : (prefill?.name ?? ''),
     summary: skill?.summary ?? prefill?.description ?? '',
-    category_id: skill?.category_id ?? '',
+    category_id: skill?.category_id ?? suggestedCategoryId ?? '',
     department: skill?.department ?? user?.department ?? '',
     visibility: skill?.visibility ?? 'company',
     tag_ids: skill?.tag_ids ?? [],
+    output_types: skill?.output_types?.length ? skill.output_types : (prefill?.output_types ?? []),
+    ecosystems: skill?.ecosystems?.length ? skill.ecosystems : (prefill?.ecosystems ?? []),
     version: target ?? '',
     changelog: targetVersion?.changelog ?? '',
   }
@@ -236,6 +249,8 @@ export function WizardPage() {
     latest_version: target,
     has_icon: false,
     tags: (skill?.tag_ids ?? []).map((tid) => tagNames.get(tid)).filter((n): n is string => !!n),
+    output_types: skill?.output_types ?? [],
+    ecosystems: skill?.ecosystems ?? [],
     install_count: 0,
     download_count: 0,
     published_at: null,
@@ -286,6 +301,7 @@ export function WizardPage() {
         <InfoStep
           key={`${target}-${skill.updated_at}`}
           defaults={defaults}
+          suggested={suggested}
           skillFieldsEditable={skill.status === 'draft'}
           nameEditable={skill.status === 'draft'}
           releasedVersions={released}

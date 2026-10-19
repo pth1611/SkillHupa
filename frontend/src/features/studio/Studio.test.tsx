@@ -16,7 +16,7 @@ const ver = (over: Partial<OwnerVersionData> = {}): OwnerVersionData => ({
 
 const mineItem = (over: Partial<SkillMineData>): SkillMineData => ({
   id: 7, name: 'Báo cáo', summary: null, category_id: null, department: 'Kế toán', visibility: 'company',
-  status: 'draft', origin: 'internal', latest_version_id: null, download_count: 0,
+  status: 'draft', origin: 'internal', latest_version_id: null, output_types: [], ecosystems: [], download_count: 0,
   updated_at: '2026-01-01T00:00:00Z', latest_draft_version: ver(), ...over,
 })
 
@@ -27,7 +27,7 @@ const finding = (result: Finding['result'], detail: string): Finding => ({
 const detail = (over: Partial<SkillDetailData> = {}): SkillDetailData => ({
   id: 7, name: 'Báo cáo', summary: null, category_id: null, department: 'Kế toán', visibility: 'company',
   status: 'draft', origin: 'internal', owner_id: 1, owner_name: 'An', has_icon: false, latest_version_id: null,
-  latest_version: null, viewing_version: null, skill_md: '# Xin chào', tags: [], tag_ids: [], install_count: 0,
+  latest_version: null, viewing_version: null, skill_md: '# Xin chào', tags: [], tag_ids: [], output_types: [], ecosystems: [], install_count: 0,
   download_count: 0, source_url: null, source_name: null, upstream_author: null, license: null,
   upstream_status: null, updated_at: '2026-01-01T00:00:00Z', ...over,
 })
@@ -141,6 +141,18 @@ describe('Wizard', () => {
     expect(await screen.findByRole('heading', { name: 'Thẻ skill khi hiển thị' })).toBeInTheDocument()
     const skillPatch = calls.find((c) => c.url.pathname === '/api/skills/7' && c.init.method === 'PATCH')!
     expect(JSON.parse(String(skillPatch.init.body))).toMatchObject({ summary: 'Mô tả đã sửa', category_id: 10, visibility: 'company' })
+  })
+
+  it('bước 2: đánh nhãn giá trị do máy gợi ý (ô loại đầu ra) và nút dùng tên gợi ý', async () => {
+    mockApi({
+      ...common,
+      '/api/taxonomy': () => ({ output_types: ['document', 'code'], ecosystems: ['github'] }),
+      '/api/skills/7': () => detail({ output_types: ['document'], auto_output_types: ['document'], name: 'remotion-best-practices' }),
+      '/api/skills/7/versions': () => [ver({ version: '1.0.0' })],
+      '/api/skills/7/versions/1.0.0/validation': () => ({ phase: 'preview', ok: true, results: [] }),
+    })
+    renderApp('/studio/7?version=1.0.0&step=2')
+    expect(await screen.findByText(/Tự động gợi ý, hãy kiểm tra lại/)).toBeInTheDocument()
   })
 
   it('bước 2: số phiên bản không lớn hơn bản đã đăng bị chặn ngay trên form', async () => {

@@ -17,11 +17,14 @@ function scope(visibility: string, department: string | null, t: (k: string, o?:
 }
 
 export function VisibilityReviewPage() {
-  const { t } = useTranslation()
   const { requestId } = useParams()
-  const id = Number(requestId)
-  const { user } = useAuth()
   const navigate = useNavigate()
+  return <VisibilityReviewView id={Number(requestId)} onDecided={() => navigate('/reviews', { replace: true })} />
+}
+
+export function VisibilityReviewView({ id, onDecided, embedded = false }: { id: number; onDecided: () => void; embedded?: boolean }) {
+  const { t } = useTranslation()
+  const { user } = useAuth()
   const queryClient = useQueryClient()
   const [error, setError] = useState<string | null>(null)
   const valid = Number.isInteger(id) && id > 0
@@ -31,24 +34,26 @@ export function VisibilityReviewPage() {
     mutationFn: (v: { decision: 'approved' | 'rejected'; comment: string | null }) => decideRequest(id, v.decision, v.comment),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: reviewKeys.all })
-      navigate('/reviews', { replace: true })
+      onDecided()
     },
     onError: (e) => setError(e instanceof ApiError ? e.message : t('state.error')),
   })
 
-  if (!valid || (request.error instanceof ApiError && request.error.status === 404)) return <NotFoundPage />
-  if (request.isPending) return <LoadingState fullPage />
-  if (request.isError) return <ErrorState fullPage onRetry={() => void request.refetch()} />
+  if (!valid || (request.error instanceof ApiError && request.error.status === 404)) return embedded ? <ErrorState /> : <NotFoundPage />
+  if (request.isPending) return <LoadingState fullPage={!embedded} />
+  if (request.isError) return <ErrorState fullPage={!embedded} onRetry={() => void request.refetch()} />
 
   const r = request.data
-  const canDecide = user?.role === 'reviewer' && r.status === 'pending'
+  const canDecide = (user?.role === 'reviewer' || user?.role === 'manager') && r.status === 'pending'
 
   return (
-    <Container maxWidth="md" sx={{ py: 3 }}>
+    <Container maxWidth="md" disableGutters={embedded} sx={{ py: embedded ? 0 : 3 }}>
       <Stack spacing={2.5}>
-        <Button component={RouterLink} to="/reviews" size="small" sx={{ alignSelf: 'flex-start' }}>
-          ← {t('reviews.backToQueue')}
-        </Button>
+        {!embedded && (
+          <Button component={RouterLink} to="/reviews" size="small" sx={{ alignSelf: 'flex-start' }}>
+            ← {t('reviews.backToQueue')}
+          </Button>
+        )}
         <Typography variant="h5" component="h1">
           {t('reviews.visibilityTitle', { name: r.skill_name })}
         </Typography>
@@ -74,9 +79,7 @@ export function VisibilityReviewPage() {
         {r.status !== 'pending' && <Alert severity="info">{t('reviews.notPending')}</Alert>}
         {canDecide ? (
           <DecisionPanel busy={decide.isPending} error={error} onSubmit={(decision, comment) => decide.mutate({ decision, comment })} />
-        ) : (
-          user?.role === 'manager' && <Alert severity="info">{t('reviews.managerReadOnly')}</Alert>
-        )}
+        ) : null}
       </Stack>
     </Container>
   )

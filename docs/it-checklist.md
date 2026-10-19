@@ -1,4 +1,4 @@
-# Checklist gửi IT: chạy thật Skill Marketplace
+# Checklist gửi IT: chạy thật Vita-skill
 
 Mục đích: danh sách mọi thứ cần IT/đội liên quan cung cấp để chạy thật một vòng (SSO, CLI device code, Blob).
 Tham chiếu: [architecture.md](architecture.md) mục 4 và 12, [../backend/.env.example](../backend/.env.example).

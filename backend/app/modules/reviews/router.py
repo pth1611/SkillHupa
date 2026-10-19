@@ -9,6 +9,8 @@ from app.modules.reviews import service
 from app.modules.reviews.exceptions import ReviewItemNotFound
 from app.modules.reviews.schemas import (
     AssignRequest,
+    BulkAssignRequest,
+    BulkResult,
     DecisionRequest,
     FileContentOut,
     FileEntryOut,
@@ -24,7 +26,6 @@ from app.shared.pagination import Page, PageParams
 
 router = APIRouter(prefix="/api/reviews", tags=["reviews"])
 
-Reviewer = Annotated[User, Depends(require_roles(Role.REVIEWER))]
 Manager = Annotated[User, Depends(require_roles(Role.MANAGER))]
 ReviewerOrManager = Annotated[User, Depends(require_roles(Role.REVIEWER, Role.MANAGER))]
 Storage = Annotated[BlobStorage, Depends(get_storage)]
@@ -46,7 +47,7 @@ def queue(
 
 
 @router.get("/history", response_model=Page[HistoryItem])
-def history(db: DbSession, user: Reviewer, params: Annotated[PageParams, Depends()]) -> Page[HistoryItem]:
+def history(db: DbSession, user: ReviewerOrManager, params: Annotated[PageParams, Depends()]) -> Page[HistoryItem]:
     return service.history(db, user, params)
 
 
@@ -57,7 +58,10 @@ def history(db: DbSession, user: Reviewer, params: Annotated[PageParams, Depends
 def version_detail(version_id: int, db: DbSession, user: ReviewerOrManager) -> VersionReviewDetail:
     version, skill = service.load_version(db, user, version_id)
     base = skills_api.base_version(skill, exclude_id=version.id)
+    facets = skills_api.facets_of(db, skill.id)
     return VersionReviewDetail(
+        output_types=facets["output_type"],
+        ecosystems=facets["ecosystem"],
         version_id=version.id,
         version=version.version,
         status=version.status,
@@ -125,6 +129,12 @@ def version_package(version_id: int, db: DbSession, storage: Storage, user: Revi
     )
 
 
+@router.put("/assignments")
+def bulk_assign(body: BulkAssignRequest, db: DbSession, user: Manager) -> list[BulkResult]:
+    results = service.bulk_assign(db, user, body.reviewer_id, [(i.kind, i.id) for i in body.items])
+    return [BulkResult(kind=k, id=i, error=e) for k, i, e in results]  # type: ignore[arg-type]
+
+
 @router.put("/versions/{version_id}/assignment", status_code=status.HTTP_204_NO_CONTENT)
 def assign_version(version_id: int, body: AssignRequest, db: DbSession, user: Manager) -> Response:
     service.assign_version(db, user, version_id, body.reviewer_id)
@@ -139,7 +149,7 @@ def unassign_version(version_id: int, db: DbSession, user: Manager) -> Response:
 
 @router.post("/versions/{version_id}/decision", status_code=status.HTTP_204_NO_CONTENT)
 def decide_version(
-    version_id: int, body: DecisionRequest, db: DbSession, storage: Storage, user: Reviewer
+    version_id: int, body: DecisionRequest, db: DbSession, storage: Storage, user: ReviewerOrManager
 ) -> Response:
     service.decide_version(db, storage, user, version_id, body.decision, body.comment)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -175,6 +185,6 @@ def assign_request(request_id: int, body: AssignRequest, db: DbSession, user: Ma
 
 
 @router.post("/visibility-requests/{request_id}/decision", status_code=status.HTTP_204_NO_CONTENT)
-def decide_request(request_id: int, body: DecisionRequest, db: DbSession, user: Reviewer) -> Response:
+def decide_request(request_id: int, body: DecisionRequest, db: DbSession, user: ReviewerOrManager) -> Response:
     service.decide_request(db, user, request_id, body.decision, body.comment)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

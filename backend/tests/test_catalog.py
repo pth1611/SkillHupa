@@ -242,7 +242,7 @@ def test_categories_seeded_by_migration(tmp_path):
         os.environ["DATABASE_URL"] = old
     with create_engine(url).connect() as conn:
         slugs = [r[0] for r in conn.execute(text("SELECT slug FROM categories ORDER BY id"))]
-    assert "khac" in slugs and len(slugs) == 6
+    assert "khac" in slugs and "nhan-su" in slugs and len(slugs) == 10
 
 
 def test_department_must_be_in_standard_list(make_app):
@@ -291,3 +291,67 @@ def test_detail_hides_unpublished_versions_from_others(w):
     sid, _vid, _ = w.submit(version="1.0.0")
     assert w.manager.get(f"/api/skills/{sid}", params={"version": "1.0.0"}).status_code == 200
     assert w.user.get(f"/api/skills/{sid}").status_code == 404
+
+
+# ---- phân loại theo loại đầu ra và ứng dụng (D52) ----------------------------
+
+
+def test_taxonomy_lists_allowed_values(w):
+    data = w.user.get("/api/taxonomy").json()
+    assert "code" in data["output_types"] and "github" in data["ecosystems"]
+
+
+def test_classification_filters_and_facets(w):
+    publish(w, " A", output_types=["code", "document"], ecosystems=["github"])
+    publish(w, " B", output_types=["document"])
+    publish(w, " C")  # chưa phân loại
+
+    got = names(w.user.get("/api/skills", params={"output_type": "code"}))
+    assert got == ["Báo cáo tuần A"]
+    # nhiều giá trị trong một chiều: khớp một trong số đó (OR)
+    both = names(w.user.get("/api/skills", params=[("output_type", "code"), ("output_type", "document")]))
+    assert sorted(both) == ["Báo cáo tuần A", "Báo cáo tuần B"]
+    # hai chiều khác nhau: phải khớp cả hai (AND)
+    assert names(w.user.get("/api/skills", params={"output_type": "document", "ecosystem": "github"})) == [
+        "Báo cáo tuần A"
+    ]
+
+    card = w.user.get("/api/skills", params={"output_type": "code"}).json()["items"][0]
+    assert card["output_types"] == ["code", "document"] and card["ecosystems"] == ["github"]
+
+    facets = w.user.get("/api/skills/facets").json()
+    assert facets["total"] == 3
+    assert facets["output_types"] == {"code": 1, "document": 2}
+    assert facets["ecosystems"] == {"github": 1}
+    # chọn "code": số đếm của chiều đó không tự thu hẹp, chiều khác thì có
+    narrowed = w.user.get("/api/skills/facets", params={"output_type": "code"}).json()
+    assert narrowed["output_types"] == {"code": 1, "document": 2}
+    assert narrowed["ecosystems"] == {"github": 1}
+    assert narrowed["total"] == 1
+
+
+def test_facets_respect_visibility(w):
+    publish(w, " kín", visibility="department", department="Nhân sự", output_types=["code"])
+    assert w.user.get("/api/skills/facets").json()["output_types"] == {}  # người ngoài phòng ban không đếm được
+
+
+def test_unknown_classification_rejected(w):
+    resp = w.creator.post(
+        "/api/skills",
+        data={"metadata": json.dumps({"output_types": ["hologram"]})},
+        files={"package": ("s.zip", package(), "application/zip")},
+        headers=csrf_headers(w.creator),
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "UNKNOWN_CLASSIFICATION"
+
+
+def test_update_classification(w):
+    sid, _ = publish(w, " A", output_types=["code"])
+    ok = w.creator.patch(
+        f"/api/skills/{sid}", json={"output_types": ["video"], "ecosystems": ["teams"]}, headers=csrf_headers(w.creator)
+    )
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["output_types"] == ["video"]
+    detail = w.user.get(f"/api/skills/{sid}").json()
+    assert detail["output_types"] == ["video"] and detail["ecosystems"] == ["teams"]

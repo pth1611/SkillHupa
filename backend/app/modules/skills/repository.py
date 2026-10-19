@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.modules.skills.models import (
     Category,
     Skill,
+    SkillFacet,
     SkillStatus,
     SkillTag,
     SkillVersion,
@@ -14,6 +15,7 @@ from app.modules.skills.models import (
     VersionStatus,
     Visibility,
 )
+from app.modules.skills.taxonomy import ECOSYSTEM, OUTPUT_TYPE
 
 
 def get_skill(db: Session, skill_id: int) -> Skill | None:
@@ -99,8 +101,7 @@ def _like(text: str) -> str:
     return f"%{escaped.lower()}%"
 
 
-def search_published(
-    db: Session,
+def _filtered(
     *,
     viewer_id: int,
     viewer_department: str | None,
@@ -109,20 +110,27 @@ def search_published(
     category_id: int | None,
     department: str | None,
     tags: list[str],
-    sort: str,
-    offset: int,
-    limit: int,
-) -> tuple[list[Skill], int]:
+    output_types: list[str],
+    ecosystems: list[str],
+    skip: str | None = None,
+):
+    """Truy vấn skill đã đăng mà người xem được thấy, kèm bộ lọc. `skip` bỏ một chiều lọc
+    (`category`, `output_type`, `ecosystem`) để đếm facet kiểu "chọn thêm giá trị khác"."""
     stmt = select(Skill).where(Skill.status == SkillStatus.PUBLISHED.value)
     if not is_manager:
         allowed = [Skill.visibility == Visibility.COMPANY.value, Skill.owner_id == viewer_id]
         if viewer_department:
             allowed.append(Skill.department == viewer_department)
         stmt = stmt.where(or_(*allowed))
-    if category_id is not None:
+    if category_id is not None and skip != "category":
         stmt = stmt.where(Skill.category_id == category_id)
     if department:
         stmt = stmt.where(Skill.department == department)
+    for kind, slugs in ((OUTPUT_TYPE, output_types), (ECOSYSTEM, ecosystems)):
+        if slugs and skip != kind:  # nhiều giá trị trong cùng một chiều: khớp một trong số đó (OR)
+            stmt = stmt.where(
+                Skill.id.in_(select(SkillFacet.skill_id).where(SkillFacet.kind == kind, SkillFacet.slug.in_(slugs)))
+            )
     if q and q.strip():
         pattern = _like(q.strip())
         tag_match = (
@@ -145,6 +153,30 @@ def search_published(
                 .where(Tag.status == TagStatus.APPROVED.value, func.lower(Tag.name) == name.lower())
             )
         )
+    return stmt
+
+
+def search_published(
+    db: Session,
+    *,
+    viewer_id: int,
+    viewer_department: str | None,
+    is_manager: bool,
+    q: str | None,
+    category_id: int | None,
+    department: str | None,
+    tags: list[str],
+    output_types: list[str] | None = None,
+    ecosystems: list[str] | None = None,
+    sort: str,
+    offset: int,
+    limit: int,
+) -> tuple[list[Skill], int]:
+    stmt = _filtered(
+        viewer_id=viewer_id, viewer_department=viewer_department, is_manager=is_manager, q=q,
+        category_id=category_id, department=department, tags=tags,
+        output_types=output_types or [], ecosystems=ecosystems or [],
+    )
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     order = {
         "popular": (Skill.download_count.desc(), Skill.published_at.desc()),
@@ -152,6 +184,100 @@ def search_published(
     }.get(sort, (Skill.published_at.desc(), Skill.id.desc()))
     rows = db.scalars(stmt.order_by(*order, Skill.id.asc()).offset(offset).limit(limit))
     return list(rows), total
+
+
+def facet_counts(
+    db: Session,
+    *,
+    viewer_id: int,
+    viewer_department: str | None,
+    is_manager: bool,
+    q: str | None,
+    category_id: int | None,
+    department: str | None,
+    tags: list[str],
+    output_types: list[str],
+    ecosystems: list[str],
+) -> dict[str, dict]:
+    """Số skill khớp cho từng giá trị của mỗi chiều phân loại, áp dụng mọi bộ lọc khác và phạm vi xem."""
+    common = {
+        "viewer_id": viewer_id, "viewer_department": viewer_department, "is_manager": is_manager, "q": q,
+        "category_id": category_id, "department": department, "tags": tags,
+        "output_types": output_types, "ecosystems": ecosystems,
+    }
+    out: dict[str, dict] = {}
+    base = _filtered(**common, skip="category").subquery()
+    out["category"] = {
+        cid: n
+        for cid, n in db.execute(
+            select(base.c.category_id, func.count()).where(base.c.category_id.is_not(None)).group_by(base.c.category_id)
+        )
+    }
+    for kind in (OUTPUT_TYPE, ECOSYSTEM):
+        sub = _filtered(**common, skip=kind).subquery()
+        out[kind] = dict(
+            db.execute(
+                select(SkillFacet.slug, func.count())
+                .join(sub, sub.c.id == SkillFacet.skill_id)
+                .where(SkillFacet.kind == kind)
+                .group_by(SkillFacet.slug)
+            ).all()
+        )
+    out["total"] = db.scalar(select(func.count()).select_from(_filtered(**common).subquery())) or 0
+    return out
+
+
+def facet_slugs_of(db: Session, skill_ids: list[int]) -> dict[int, dict[str, list[str]]]:
+    if not skill_ids:
+        return {}
+    stmt = (
+        select(SkillFacet.skill_id, SkillFacet.kind, SkillFacet.slug)
+        .where(SkillFacet.skill_id.in_(skill_ids))
+        .order_by(SkillFacet.slug)
+    )
+    out: dict[int, dict[str, list[str]]] = {}
+    for skill_id, kind, slug in db.execute(stmt):
+        out.setdefault(skill_id, {OUTPUT_TYPE: [], ECOSYSTEM: []})[kind].append(slug)
+    return out
+
+
+FACET_MANUAL = "manual"
+FACET_AUTO = "auto"
+
+
+def set_skill_facets(
+    db: Session, skill_id: int, kind: str, slugs: list[str], *, source: str = FACET_MANUAL,
+    scores: dict[str, int] | None = None,
+) -> None:
+    db.query(SkillFacet).filter(SkillFacet.skill_id == skill_id, SkillFacet.kind == kind).delete()
+    for slug in sorted(set(slugs)):
+        db.add(SkillFacet(skill_id=skill_id, kind=kind, slug=slug, source=source, score=(scores or {}).get(slug)))
+    db.flush()
+
+
+def manual_facet_kinds(db: Session, skill_id: int) -> set[str]:
+    stmt = select(SkillFacet.kind).where(SkillFacet.skill_id == skill_id, SkillFacet.source == FACET_MANUAL).distinct()
+    return set(db.scalars(stmt))
+
+
+def auto_facet_slugs(db: Session, skill_id: int) -> dict[str, list[str]]:
+    stmt = (
+        select(SkillFacet.kind, SkillFacet.slug)
+        .where(SkillFacet.skill_id == skill_id, SkillFacet.source == FACET_AUTO)
+        .order_by(SkillFacet.slug)
+    )
+    out: dict[str, list[str]] = {OUTPUT_TYPE: [], ECOSYSTEM: []}
+    for kind, slug in db.execute(stmt):
+        out[kind].append(slug)
+    return out
+
+
+def skill_ids_without_manual_facets(db: Session, *, only_empty: bool) -> list[int]:
+    """Skill cần backfill: chưa có facet nào (only_empty) hoặc chưa có facet do người chọn."""
+    has_any = select(SkillFacet.skill_id)
+    if not only_empty:
+        has_any = has_any.where(SkillFacet.source == FACET_MANUAL)
+    return list(db.scalars(select(Skill.id).where(Skill.id.not_in(has_any)).order_by(Skill.id)))
 
 
 def approved_tag_names(db: Session, skill_ids: list[int]) -> dict[int, list[str]]:
@@ -174,6 +300,10 @@ def versions_by_id(db: Session, version_ids: list[int]) -> dict[int, SkillVersio
     if not ids:
         return {}
     return {v.id: v for v in db.scalars(select(SkillVersion).where(SkillVersion.id.in_(ids)))}
+
+
+def category_id_by_slug(db: Session, slug: str | None) -> int | None:
+    return db.scalar(select(Category.id).where(Category.slug == slug)) if slug else None
 
 
 def list_categories(db: Session) -> list[Category]:

@@ -15,12 +15,26 @@ export function DecisionPanel({ busy, error, unseenWarnings = 0, onSubmit }: Pro
   const [decision, setDecision] = useState<'approved' | 'rejected'>('approved')
   const [comment, setComment] = useState('')
   const [touched, setTouched] = useState(false)
+  const [open, setOpen] = useState(false)
   const needComment = decision === 'rejected' && !comment.trim()
 
   function submit() {
     setTouched(true)
     if (needComment) return
     onSubmit(decision, comment.trim() || null)
+  }
+
+  if (!open) {
+    return (
+      <Paper variant="outlined" sx={{ p: 2, position: 'sticky', bottom: 0, zIndex: 1 }}>
+        <Stack spacing={1.5} alignItems="flex-start">
+          {unseenWarnings > 0 && <Alert severity="info">{t('reviews.unseenWarnings', { count: unseenWarnings })}</Alert>}
+          <Button variant="contained" onClick={() => setOpen(true)}>
+            {t('reviews.openDecision')}
+          </Button>
+        </Stack>
+      </Paper>
+    )
   }
 
   return (
@@ -53,6 +67,9 @@ export function DecisionPanel({ busy, error, unseenWarnings = 0, onSubmit }: Pro
             onClick={submit}
           >
             {t('reviews.send')}
+          </Button>
+          <Button disabled={busy} onClick={() => setOpen(false)} sx={{ ml: 1 }}>
+            {t('common.cancel')}
           </Button>
         </Box>
       </Stack>

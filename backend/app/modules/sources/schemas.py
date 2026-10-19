@@ -13,7 +13,7 @@ class SourceCreate(BaseModel):
     url: str = Field(min_length=1, max_length=1000)
     ref: str | None = Field(None, max_length=100)
     path_glob: str = Field("", max_length=500)
-    default_category: int
+    default_category: int | None = None  # None = tự động phân loại
     default_department: str = Field(min_length=1, max_length=255)
     default_visibility: Visibility = "company"
     credential_name: str | None = Field(None, max_length=100)
@@ -42,7 +42,7 @@ class SourceOut(BaseModel):
     url: str
     ref: str | None
     path_glob: str
-    default_category: int
+    default_category: int | None
     default_department: str
     default_visibility: str
     credential_name: str | None
@@ -74,3 +74,4 @@ class ScanOut(BaseModel):
     commit: str | None
     counts: dict[str, int]
     items: list[dict[str, Any]]
+    total: int | None = None

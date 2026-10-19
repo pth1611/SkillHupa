@@ -48,6 +48,15 @@ export const fetchUsers = (params: { q?: string; role?: string; page_size?: numb
 export const assignVersion = (versionId: number, reviewerId: number) =>
   api(`/api/reviews/versions/${versionId}/assignment`, { method: 'PUT', json: { reviewer_id: reviewerId } })
 
+export interface BulkAssignResult {
+  kind: 'version' | 'visibility'
+  id: number
+  error: string | null
+}
+
+export const bulkAssign = (reviewerId: number, items: { kind: 'version' | 'visibility'; id: number }[]) =>
+  api<BulkAssignResult[]>('/api/reviews/assignments', { method: 'PUT', json: { reviewer_id: reviewerId, items } })
+
 export const unassignVersion = (versionId: number) =>
   api(`/api/reviews/versions/${versionId}/assignment`, { method: 'DELETE' })
 
@@ -107,7 +116,7 @@ export interface SourceInput {
   url: string
   ref?: string | null
   path_glob?: string
-  default_category: number
+  default_category: number | null
   default_department: string
   default_visibility: 'company' | 'department'
   credential_name?: string | null
