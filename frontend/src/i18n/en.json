@@ -35,7 +35,6 @@
     "devFailed": "Test sign-in is disabled or failed."
   },
   "home": {
-    "bannerTitle": "Skills shared across the whole company",
     "searchPlaceholder": "Search skills by name, description, tag…",
     "search": "Search",
     "tabAll": "All",
@@ -48,7 +47,14 @@
     "ctaCreatorButton": "Submit a skill",
     "ctaOthers": "Want to contribute? Ask an administrator to add you to the Creator group in Entra ID.",
     "footerCli": "Install from the command line: npm install -g @company/skillmkt",
-    "footerContact": "Contact the marketplace administrators for help."
+    "footerContact": "Contact the marketplace administrators for help.",
+    "heroLine1": "Skills that make your agents",
+    "heroAccent": "come alive",
+    "heroSubtitle": "Discover, install and share SKILL.md packs for Claude Code, Codex, Cursor and every agent that speaks the open skill format.",
+    "statSkills": "Skills",
+    "statCategories": "Categories",
+    "statDepartments": "Departments",
+    "featuredSubtitle": "Hand-picked by the team"
   },
   "card": {
     "installs": "{{count}} installs",

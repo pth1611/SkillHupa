@@ -35,7 +35,6 @@
     "devFailed": "Đăng nhập thử bị tắt hoặc lỗi."
   },
   "home": {
-    "bannerTitle": "Skill dùng chung cho cả công ty",
     "searchPlaceholder": "Tìm skill theo tên, mô tả, tag…",
     "search": "Tìm kiếm",
     "tabAll": "Tất cả",
@@ -48,7 +47,14 @@
     "ctaCreatorButton": "Gửi skill",
     "ctaOthers": "Muốn đóng góp skill? Hãy nhờ quản trị viên thêm bạn vào nhóm Creator trong Entra ID.",
     "footerCli": "Cài bằng dòng lệnh: npm install -g @công-ty/skillmkt",
-    "footerContact": "Liên hệ quản trị viên marketplace khi cần hỗ trợ."
+    "footerContact": "Liên hệ quản trị viên marketplace khi cần hỗ trợ.",
+    "heroLine1": "Skill giúp agent của bạn",
+    "heroAccent": "sống động hơn",
+    "heroSubtitle": "Tìm, cài đặt và chia sẻ các gói SKILL.md cho Claude Code, Codex, Cursor và mọi agent hiểu định dạng skill mở.",
+    "statSkills": "Skill",
+    "statCategories": "Danh mục",
+    "statDepartments": "Phòng ban",
+    "featuredSubtitle": "Do đội ngũ chọn lọc"
   },
   "card": {
     "installs": "{{count}} lượt cài",

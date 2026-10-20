@@ -1,0 +1,30 @@
+# Dùng cho image web trên Railway. nginx thay ${PORT} và ${BACKEND_URL} lúc khởi động
+# (BACKEND_URL chỉ gồm host:port, vd http://backend.railway.internal:8000).
+server {
+    listen ${PORT};
+    root /usr/share/nginx/html;
+    client_max_body_size 12m;
+
+    # DNS của mạng nội bộ Railway; resolve lúc chạy nên backend khởi động chậm cũng không sao.
+    resolver [fd12::10] valid=10s ipv6=on;
+
+    location /api/ {
+        set $upstream ${BACKEND_URL};
+        proxy_pass $upstream;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+        proxy_read_timeout 60s;
+    }
+
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    location / {
+        add_header Cache-Control "no-store";
+        try_files $uri /index.html;
+    }
+}

@@ -2,9 +2,9 @@
 export const brand = {
   productName: 'Vita-skill',
   /** Chữ hiển thị cạnh logo khi chưa có file logo. */
-  logoText: 'VSF',
-  primary: '#1f6feb',
-  secondary: '#7c4dff',
+  logoText: 'V',
+  primary: '#10b981',
+  secondary: '#6366f1',
   /** Dải màu nền cho biểu tượng mặc định sinh từ tên skill (skill không có ảnh, D39). */
-  avatarPalette: ['#1f6feb', '#7c4dff', '#0e8a6b', '#d97706', '#c2410c', '#be185d', '#0f766e', '#4d7c0f'],
+  avatarPalette: ['#6366f1', '#ec4899', '#0e8a6b', '#f59e0b', '#ef4444', '#3b82f6', '#0f766e', '#8b5cf6'],
 } as const

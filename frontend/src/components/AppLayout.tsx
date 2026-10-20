@@ -1,3 +1,4 @@
+import AddIcon from '@mui/icons-material/Add'
 import DarkModeIcon from '@mui/icons-material/DarkModeOutlined'
 import LightModeIcon from '@mui/icons-material/LightModeOutlined'
 import MenuIcon from '@mui/icons-material/Menu'
@@ -40,17 +41,27 @@ export function AppLayout() {
     <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppBar position="sticky" sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
         <Toolbar sx={{ gap: 1 }}>
-          <Typography
+          <Stack
             component={RouterLink}
             to="/"
-            variant="h6"
-            sx={{ color: 'primary.main', fontWeight: 800, textDecoration: 'none', mr: 2 }}
+            direction="row"
+            alignItems="center"
+            spacing={1.25}
+            sx={{ textDecoration: 'none', color: 'text.primary', mr: 3 }}
           >
-            {brand.logoText}
-            <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' }, ml: 1, color: 'text.primary' }}>
-              {brand.productName}
+            <Box
+              sx={(theme) => ({
+                width: 36, height: 36, borderRadius: 2, display: 'grid', placeItems: 'center',
+                color: '#fff', fontWeight: 800, fontSize: '1.15rem',
+                backgroundImage: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+              })}
+            >
+              {brand.logoText}
             </Box>
-          </Typography>
+            <Typography variant="h6" sx={{ display: { xs: 'none', sm: 'block' }, fontWeight: 800 }}>
+              {brand.productName}
+            </Typography>
+          </Stack>
 
           <Stack direction="row" spacing={0.5} sx={{ display: { xs: 'none', md: 'flex' }, flexGrow: 1 }} component="nav">
             {items.map((item) => (
@@ -60,7 +71,7 @@ export function AppLayout() {
                 to={item.to}
                 end={item.to === '/'}
                 color="inherit"
-                sx={{ '&.active': { color: 'primary.main' } }}
+                sx={{ color: 'text.secondary', '&.active': { color: 'text.primary' } }}
               >
                 {item.label}
               </Button>
@@ -118,6 +129,18 @@ export function AppLayout() {
             ))}
           </Menu>
 
+          {(user?.role === 'creator' || user?.role === 'manager') && (
+            <Button
+              component={RouterLink}
+              to="/studio/new"
+              variant="contained"
+              startIcon={<AddIcon />}
+              sx={{ ml: 1, display: { xs: 'none', sm: 'inline-flex' } }}
+            >
+              {t('home.ctaCreatorButton')}
+            </Button>
+          )}
+
           {user && (
             <Stack direction="row" alignItems="center" spacing={1} sx={{ ml: 1 }}>
               <ListItemText
@@ -127,7 +150,7 @@ export function AppLayout() {
                 primaryTypographyProps={{ variant: 'body2', noWrap: true }}
                 secondaryTypographyProps={{ variant: 'caption' }}
               />
-              <Button size="small" variant="outlined" onClick={() => void logout()}>
+              <Button size="small" variant="contained" color="inherit" onClick={() => void logout()} sx={{ bgcolor: 'action.hover', boxShadow: 'none' }}>
                 {t('nav.logout')}
               </Button>
             </Stack>

@@ -150,7 +150,7 @@ describe('ReviewQueuePage', () => {
       '/api/skills': () => ({ items: [], total: 0, page: 1, page_size: 8 }),
     })
     renderApp('/reviews')
-    expect(await screen.findByRole('heading', { name: 'Skill dùng chung cho cả công ty' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Skill giúp agent của bạn sống động hơn' })).toBeInTheDocument()
   })
 })
 

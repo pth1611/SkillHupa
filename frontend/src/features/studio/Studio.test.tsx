@@ -78,7 +78,7 @@ describe('StudioPage', () => {
   it('người thường bị chuyển về trang chủ', async () => {
     mockApi({ ...common, '/api/auth/me': () => me('user'), '/api/skills/featured': () => [], '/api/skills': () => ({ items: [], total: 0, page: 1, page_size: 8 }) })
     renderApp('/studio')
-    expect(await screen.findByRole('heading', { name: 'Skill dùng chung cho cả công ty' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Skill giúp agent của bạn sống động hơn' })).toBeInTheDocument()
   })
 })
 
