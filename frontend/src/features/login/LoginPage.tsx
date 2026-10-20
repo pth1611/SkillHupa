@@ -39,7 +39,7 @@ export function LoginPage() {
         <Button variant="contained" size="large" href={ssoLoginUrl(next)}>
           {t('login.sso')}
         </Button>
-        {import.meta.env.DEV && (
+        {(import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEV_LOGIN === 'true') && (
           <>
             <Divider />
             <DevLogin next={next} />
