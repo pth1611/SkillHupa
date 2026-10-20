@@ -1,5 +1,5 @@
-# Dùng cho image web trên Railway. nginx thay ${PORT} và ${BACKEND_URL} lúc khởi động
-# (BACKEND_URL chỉ gồm host:port, vd http://backend.railway.internal:8000).
+# Dùng cho image web trên Railway. nginx thay biến PORT và BACKEND_URL khi khởi động.
+# Không viết dấu đô-la kèm ngoặc nhọn trong comment, vì envsubst cũng thay ở đó.
 server {
     listen ${PORT};
     root /usr/share/nginx/html;
