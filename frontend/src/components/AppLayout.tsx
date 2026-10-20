@@ -30,6 +30,7 @@ export function AppLayout() {
   const items: NavItem[] = [
     { to: '/', label: t('nav.home') },
     { to: '/my-skills', label: t('nav.mySkills') },
+    { to: '/docs', label: t('nav.docs') },
   ]
   if (user?.role === 'creator' || user?.role === 'manager') items.push({ to: '/studio', label: t('nav.studio') })
   if (user?.role === 'reviewer' || user?.role === 'manager') items.push({ to: '/reviews', label: t('nav.reviews') })

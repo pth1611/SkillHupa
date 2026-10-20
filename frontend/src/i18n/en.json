@@ -14,7 +14,8 @@
     "darkMode": "Dark mode",
     "lightMode": "Light mode",
     "logout": "Sign out",
-    "menu": "Open menu"
+    "menu": "Open menu",
+    "docs": "Docs"
   },
   "role": {
     "user": "User",
@@ -490,5 +491,47 @@
       "figma": "Figma",
       "slack": "Slack"
     }
+  },
+  "docs": {
+    "title": "Installing skills",
+    "intro": "There are three ways to bring a skill from Vita-skill into Claude Code or Cursor. Pick the one that suits you.",
+    "methodsTitle": "Ways to install",
+    "methodClaude": "The skillmkt command line for Claude Code (recommended: it tracks new versions and updates).",
+    "methodCursor": "The skillmkt command line for Cursor.",
+    "methodZip": "Download the .zip package and unpack it by hand (no CLI needed).",
+    "prepareTitle": "Preparing the command line",
+    "prepareNode": "Requires Node.js 20 or later.",
+    "prepareBuild": "Install the skillmkt command from the project source:",
+    "prepareCheck": "Check the installation:",
+    "prepareLogin": "Sign in to this server:",
+    "prepareDevNote": "A test server with dev login enabled also accepts --dev --role creator instead of Microsoft sign-in.",
+    "globalLabel": "Install globally (available to every project):",
+    "projectLabel": "Install for the current project only (run inside the project folder):",
+    "versionLabel": "Install a specific version:",
+    "claudeTitle": "Way 1: Claude Code",
+    "claudeIntro": "Replace 12 with the skill id (shown on the detail page). Or open the detail page, choose the Claude Code tab and copy the command.",
+    "claudePaths": "Skills go to ~/.claude/skills (global) or .claude/skills in the project.",
+    "cursorTitle": "Way 2: Cursor",
+    "cursorIntro": "Same as Claude Code, just change the target to cursor.",
+    "cursorPaths": "Skills go to ~/.cursor/skills (global) or .cursor/skills in the project.",
+    "zipTitle": "Way 3: Download the .zip",
+    "zipIntro": "Use this when you cannot install the CLI or want to place the package yourself.",
+    "zipStep1": "Open the skill detail page, choose the .zip tab and click Download .zip.",
+    "zipStep2": "Unzip the package.",
+    "zipStep3": "Copy the skill folder into .claude/skills/ or .cursor/skills/ (global in your home folder, or inside a project).",
+    "zipCli": "You can also download the package from the command line, without unpacking it:",
+    "zipWarn": "The system cannot tell where you placed the package, so it only warns you when something changes; manual installs do not update themselves.",
+    "manageTitle": "Managing installed skills",
+    "manageList": "See installed skills and their status:",
+    "manageOutdated": "List skills with newer versions, changing nothing:",
+    "manageUpdate": "Update every skill (add an id to update one):",
+    "manageUninstall": "Remove a skill:",
+    "faqTitle": "FAQ",
+    "faqIdQ": "Where do I find the skill id?",
+    "faqIdA": "On the skill detail page; the command in the Install tab already contains it.",
+    "faqExistsQ": "It says the folder already exists?",
+    "faqExistsA": "A folder not managed by skillmkt is never overwritten; add --force if you are sure.",
+    "faqLoginQ": "The command says you are not signed in?",
+    "faqLoginA": "Run skillmkt login --server again with this site's address."
   }
 }

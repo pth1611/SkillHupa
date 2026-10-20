@@ -14,7 +14,8 @@
     "darkMode": "Chế độ tối",
     "lightMode": "Chế độ sáng",
     "logout": "Đăng xuất",
-    "menu": "Mở menu"
+    "menu": "Mở menu",
+    "docs": "Hướng dẫn"
   },
   "role": {
     "user": "Người dùng",
@@ -490,5 +491,47 @@
       "figma": "Figma",
       "slack": "Slack"
     }
+  },
+  "docs": {
+    "title": "Hướng dẫn cài đặt skill",
+    "intro": "Có ba cách đưa một skill từ Vita-skill vào Claude Code hoặc Cursor. Chọn cách phù hợp với bạn.",
+    "methodsTitle": "Các cách cài đặt",
+    "methodClaude": "Dòng lệnh skillmkt cho Claude Code (khuyên dùng: có theo dõi bản mới và cập nhật).",
+    "methodCursor": "Dòng lệnh skillmkt cho Cursor.",
+    "methodZip": "Tải gói .zip rồi giải nén thủ công (không cần cài CLI).",
+    "prepareTitle": "Chuẩn bị cho dòng lệnh",
+    "prepareNode": "Cần Node.js 20 trở lên.",
+    "prepareBuild": "Cài lệnh skillmkt từ mã nguồn của dự án:",
+    "prepareCheck": "Kiểm tra cài đặt:",
+    "prepareLogin": "Đăng nhập vào máy chủ này:",
+    "prepareDevNote": "Máy chủ thử nghiệm bật đăng nhập thử có thể dùng thêm --dev --role creator thay cho đăng nhập Microsoft.",
+    "globalLabel": "Cài toàn cục (dùng cho mọi dự án):",
+    "projectLabel": "Cài riêng cho dự án đang mở (chạy trong thư mục dự án):",
+    "versionLabel": "Cài một phiên bản cụ thể:",
+    "claudeTitle": "Cách 1: Claude Code",
+    "claudeIntro": "Thay 12 bằng id của skill (có trên trang chi tiết). Hoặc mở trang chi tiết, chọn thẻ Claude Code và sao chép lệnh.",
+    "claudePaths": "Skill được đặt vào ~/.claude/skills (toàn cục) hoặc .claude/skills trong dự án.",
+    "cursorTitle": "Cách 2: Cursor",
+    "cursorIntro": "Giống Claude Code, chỉ đổi đích cài sang cursor.",
+    "cursorPaths": "Skill được đặt vào ~/.cursor/skills (toàn cục) hoặc .cursor/skills trong dự án.",
+    "zipTitle": "Cách 3: Tải gói .zip",
+    "zipIntro": "Dùng khi không cài được CLI hoặc muốn tự đặt gói vào nơi tùy ý.",
+    "zipStep1": "Mở trang chi tiết skill, chọn thẻ .zip rồi bấm Tải .zip.",
+    "zipStep2": "Giải nén gói.",
+    "zipStep3": "Chép thư mục skill vào .claude/skills/ hoặc .cursor/skills/ (toàn cục ở thư mục home, hoặc trong dự án).",
+    "zipCli": "Cũng có thể tải gói bằng dòng lệnh, không giải nén:",
+    "zipWarn": "Hệ thống không biết bạn đặt gói ở đâu nên chỉ cảnh báo khi có thay đổi; cài thủ công không tự cập nhật.",
+    "manageTitle": "Quản lý skill đã cài",
+    "manageList": "Xem skill đã cài và trạng thái:",
+    "manageOutdated": "Chỉ liệt kê skill có bản mới, không đổi gì:",
+    "manageUpdate": "Cập nhật mọi skill (hoặc thêm id để cập nhật một skill):",
+    "manageUninstall": "Gỡ một skill:",
+    "faqTitle": "Câu hỏi thường gặp",
+    "faqIdQ": "Lấy id skill ở đâu?",
+    "faqIdA": "Ở trang chi tiết skill; lệnh cài trong thẻ Cài đặt đã điền sẵn id.",
+    "faqExistsQ": "Báo thư mục đã có thì sao?",
+    "faqExistsA": "Thư mục không do skillmkt quản lý sẽ không bị ghi đè; thêm --force nếu bạn chắc chắn muốn thay.",
+    "faqLoginQ": "Lệnh báo chưa đăng nhập?",
+    "faqLoginA": "Chạy lại skillmkt login --server với địa chỉ của trang này."
   }
 }

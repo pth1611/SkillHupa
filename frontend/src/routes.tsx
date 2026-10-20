@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAuth, RequireRole } from './auth/AuthProvider'
 import { AppLayout } from './components/AppLayout'
 import { NotFoundPage } from './features/common/pages'
+import { DocsPage } from './features/docs/DocsPage'
 import { HomePage } from './features/home/HomePage'
 import { LoginPage } from './features/login/LoginPage'
 import { MySkillsPage } from './features/my-skills/MySkillsPage'
@@ -56,6 +57,7 @@ export function AppRoutes() {
             }
           />
           <Route path="my-skills" element={<MySkillsPage />} />
+          <Route path="docs" element={<DocsPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
 
           <Route element={<RequireRole roles={['creator', 'manager']} />}>
