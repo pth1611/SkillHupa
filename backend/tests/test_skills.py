@@ -85,6 +85,7 @@ def test_create_prefills_and_runs_preview(creator):
         "output_types": ["document"],
         "ecosystems": [],
         "category_slug": "bao-cao-tai-lieu",
+        "subcategory_slug": "bao-cao-dinh-ky",
         "name_suggestion": None,
     }
     assert body["skill"]["status"] == "draft"

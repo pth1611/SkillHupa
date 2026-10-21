@@ -13,12 +13,15 @@ const card = (id: number, name: string): SkillCardData => ({
 function setup(total = 1) {
   return mockApi({
     '/api/auth/me': () => me(),
-    '/api/categories': () => [{ id: 10, name: 'Báo cáo', slug: 'bao-cao' }],
+    '/api/categories': () => [
+      { id: 10, name: 'Báo cáo', slug: 'bao-cao', subcategories: [{ id: 100, name: 'Biên bản họp', slug: 'bien-ban-hop' }] },
+      { id: 11, name: 'Nhân sự', slug: 'nhan-su', subcategories: [] },
+    ],
     '/api/departments': () => ['Kế toán', 'Nhân sự'],
     '/api/tags': () => [{ id: 1, name: 'excel', status: 'approved', usage_count: 2 }],
     '/api/taxonomy': () => ({ output_types: ['code', 'document'], ecosystems: ['github'] }),
     '/api/skills/facets': () => ({
-      total: 1, categories: { 10: 1 }, output_types: { code: 3, document: 0 }, ecosystems: { github: 2 },
+      total: 1, categories: { 10: 1 }, subcategories: { 100: 1 }, output_types: { code: 3, document: 0 }, ecosystems: { github: 2 },
     }),
     '/api/skills': (url: URL) => ({
       items: total === 0 ? [] : [card(1, url.searchParams.get('q') ? 'Khớp từ khoá' : 'Mặc định')],
@@ -83,5 +86,18 @@ describe('SearchPage', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: 'Mã nguồn (3)' }))
     await waitFor(() => expect(lastSkillsCall(calls).getAll('output_type')).toEqual(['code']))
     expect(lastSkillsCall(calls).get('page')).toBe('1')  // đổi bộ lọc thì về trang 1
+  })
+
+  it('cây danh mục: mở danh mục rồi chọn nhóm công việc nhỏ', async () => {
+    const { calls } = setup()
+    renderApp('/skills')
+    await userEvent.click(await screen.findByRole('button', { name: 'Mở Báo cáo' }))
+    await userEvent.click(await screen.findByRole('button', { name: /Biên bản họp/ }))
+    await waitFor(() => expect(lastSkillsCall(calls).get('subcategory')).toBe('100'))
+    expect(lastSkillsCall(calls).get('category')).toBe('10')
+
+    await userEvent.click(screen.getByRole('button', { name: /Tất cả skill/ }))
+    await waitFor(() => expect(lastSkillsCall(calls).get('subcategory')).toBeNull())
+    expect(lastSkillsCall(calls).get('category')).toBeNull()
   })
 })

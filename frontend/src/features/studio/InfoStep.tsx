@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
+import { categoryLabel } from '../../i18n/taxonomyLabels'
 import { z } from 'zod'
 import { fetchCategories, fetchDepartments, fetchTags, fetchTaxonomy, skillKeys } from '../../api/skills'
 import { taxonomyLabel } from '../../utils/taxonomy'
@@ -77,7 +78,7 @@ export function InfoStep({
 
   const schema = z.object({
     name: skillFieldsEditable && nameEditable ? z.string().trim().min(1, t('studio.required')).max(100) : z.string(),
-    summary: skillFieldsEditable ? z.string().trim().min(1, t('studio.required')).max(200, t('studio.summaryMax')) : z.string(),
+    summary: skillFieldsEditable ? z.string().trim().min(1, t('studio.required')).max(1000, t('studio.summaryMax')) : z.string(),
     category_id: skillFieldsEditable ? z.number({ message: t('studio.required') }) : z.any(),
     department: skillFieldsEditable ? z.string().trim().min(1, t('studio.required')) : z.string(),
     visibility: z.enum(['company', 'department']),
@@ -150,7 +151,7 @@ export function InfoStep({
               render={({ field }) => (
                 <TextField {...field} required multiline minRows={2} label={t('studio.summary')}
                   error={!!errors.summary}
-                  helperText={errors.summary?.message ?? `${summary.length}/200`} inputProps={{ maxLength: 400 }} />
+                  helperText={errors.summary?.message ?? `${summary.length}/1000`} inputProps={{ maxLength: 1000 }} />
               )}
             />
             <Controller
@@ -167,7 +168,7 @@ export function InfoStep({
                   }
                   onChange={(e) => field.onChange(Number(e.target.value))}>
                   {(categories.data ?? []).map((c) => (
-                    <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+                    <MenuItem key={c.id} value={c.id}>{categoryLabel(t, c)}</MenuItem>
                   ))}
                 </TextField>
               )}

@@ -22,6 +22,7 @@ class Suggestion:
     output_types: list[str] = field(default_factory=list)
     ecosystems: list[str] = field(default_factory=list)
     category_slug: str | None = None
+    subcategory_slug: str | None = None
     # Điểm tin cậy theo slug (số tín hiệu khớp), lưu cùng facet để phân biệt gợi ý mạnh/yếu.
     output_scores: dict[str, int] = field(default_factory=dict)
     ecosystem_scores: dict[str, int] = field(default_factory=dict)
@@ -35,13 +36,17 @@ def _pattern(keyword: str) -> re.Pattern[str]:
 @lru_cache
 def _signals() -> dict:
     raw = taxonomy.load_signals()
-    compiled: dict = {"output_types": {}, "ecosystems": {}, "categories": {}}
+    compiled: dict = {"output_types": {}, "ecosystems": {}, "categories": {}, "subcategories": {}}
     for slug, cfg in raw["output_types"].items():
         compiled["output_types"][slug] = (set(cfg.get("extensions", [])), [_pattern(k) for k in cfg["keywords"]])
     for slug, cfg in raw["ecosystems"].items():
         compiled["ecosystems"][slug] = (set(), [_pattern(k) for k in cfg["keywords"]])
     for slug, kws in raw["categories"].items():
         compiled["categories"][slug] = (set(), [_pattern(k) for k in kws])
+    for cat_slug, subs in raw["subcategories"].items():
+        compiled["subcategories"][cat_slug] = {
+            slug: (set(), [_pattern(k) for k in kws]) for slug, kws in subs.items()
+        }
     return compiled
 
 
@@ -78,10 +83,13 @@ def suggest(info: packaging.PackageInfo) -> Suggestion:
     out = _rank(sig["output_types"], head, body, ext_counts, MAX_OUTPUT_TYPES)
     eco = _rank(sig["ecosystems"], head, body, ext_counts, MAX_ECOSYSTEMS)
     cat = _rank(sig["categories"], head, body, {}, 1)
+    category_slug = cat[0][0] if cat else None
+    sub = _rank(sig["subcategories"].get(category_slug, {}), head, body, {}, 1) if category_slug else []
     return Suggestion(
         output_types=[s for s, _ in out],
         ecosystems=[s for s, _ in eco],
-        category_slug=cat[0][0] if cat else None,
+        category_slug=category_slug,
+        subcategory_slug=sub[0][0] if sub else None,
         output_scores=dict(out),
         ecosystem_scores=dict(eco),
     )

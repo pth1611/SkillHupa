@@ -1,17 +1,20 @@
-import { Alert, Box, Button, Card, CardContent, Chip, Container, Link, Stack, Typography } from '@mui/material'
+import OpenInNewIcon from '@mui/icons-material/OpenInNew'
+import { Alert, Box, Breadcrumbs, Button, Card, CardContent, Chip, Container, Link, Stack, Typography } from '@mui/material'
 import { taxonomyLabel } from '../../utils/taxonomy'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { categoryLabel } from '../../i18n/taxonomyLabels'
 import { Link as RouterLink, useParams, useSearchParams } from 'react-router-dom'
 import { ApiError } from '../../api/client'
 import { fetchMyInstalls } from '../../api/installs'
 import { fetchCategories, fetchSkill, fetchVersions, skillKeys } from '../../api/skills'
 import type { InstallItem, SkillDetailData, VersionData } from '../../api/types'
-import { MarkdownView, safeUrl } from '../../components/MarkdownView'
+import { safeUrl } from '../../components/MarkdownView'
 import { SkillIcon } from '../../components/SkillCard'
 import { ErrorState, LoadingState } from '../../components/StateViews'
 import { skillRef, InstallPanel } from './InstallPanel'
 import { NotFoundPage } from '../common/pages'
+import { SkillFilesPanel } from './SkillFilesPanel'
 
 function InstallWarning({ skill, install }: { skill: SkillDetailData; install: InstallItem | undefined }) {
   const { t } = useTranslation()
@@ -114,7 +117,8 @@ export function SkillDetailPage() {
   const data = skill.data
   const viewing = data.viewing_version
   const latest = data.latest_version
-  const category = categories.data?.find((c) => c.id === data.category_id)?.name
+  const categoryItem = categories.data?.find((c) => c.id === data.category_id)
+  const category = categoryItem && categoryLabel(t, categoryItem)
   const install = installs.data?.find((i) => i.skill_id === data.id)
   const sourceUrl = data.source_url ? safeUrl(data.source_url) : ''
   const installable = data.status === 'published' && !!viewing && viewing.status === 'published'
@@ -122,9 +126,23 @@ export function SkillDetailPage() {
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
       <Stack spacing={3}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2.5} alignItems={{ sm: 'center' }}>
+        <Breadcrumbs aria-label="breadcrumb">
+          <Link component={RouterLink} to="/skills" underline="hover" color="text.secondary">
+            {t('detail.breadcrumbSkills')}
+          </Link>
+          {category && (
+            <Link
+              component={RouterLink} to={`/skills?category=${data.category_id}`} underline="hover" color="text.secondary"
+            >
+              {category}
+            </Link>
+          )}
+          <Typography color="text.primary" sx={{ overflowWrap: 'anywhere' }}>{data.name}</Typography>
+        </Breadcrumbs>
+
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2.5} alignItems={{ sm: 'flex-start' }}>
           <SkillIcon skill={{ id: data.id, name: data.name, has_icon: data.has_icon }} size={72} />
-          <Box sx={{ minWidth: 0 }}>
+          <Box sx={{ minWidth: 0, flexGrow: 1 }}>
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
               <Typography variant="h4" component="h1" sx={{ overflowWrap: 'anywhere' }}>
                 {data.name}
@@ -144,14 +162,16 @@ export function SkillDetailPage() {
                     .filter(Boolean)
                     .join(' · ')
                 : data.owner_name && `${t('detail.owner')}: ${data.owner_name}`}
-              {category && ` · ${category}`}
               {` · ${
                 data.visibility === 'department'
                   ? t('detail.departmentOnly', { department: data.department })
                   : t('detail.companyWide')
               }`}
             </Typography>
-            <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mt: 1 }}>
+            <Typography sx={{ mt: 1.5, maxWidth: 820, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+              {data.summary}
+            </Typography>
+            <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 1.5 }}>
               {data.output_types.map((slug) => (
                 <Chip key={slug} size="small" variant="outlined" color="primary" label={taxonomyLabel(t, 'output', slug)}
                   component={RouterLink} to={`/skills?output_type=${encodeURIComponent(slug)}`} clickable />
@@ -163,18 +183,29 @@ export function SkillDetailPage() {
               {data.tags.map((tag) => (
                 <Chip key={tag} size="small" label={tag} component={RouterLink} to={`/skills?tag=${encodeURIComponent(tag)}`} clickable />
               ))}
-              <Typography variant="body2" color="text.secondary">
-                {t('detail.installs', { count: data.install_count })} ·{' '}
-                {t('detail.downloads', { count: data.download_count })}
-              </Typography>
-              {sourceUrl && (
-                <Link href={sourceUrl} target="_blank" rel="noopener noreferrer" variant="body2">
-                  {t('detail.viewAtSource')}
-                </Link>
-              )}
             </Stack>
           </Box>
+          {sourceUrl && (
+            <Button
+              href={sourceUrl} target="_blank" rel="noopener noreferrer" variant="outlined" size="small"
+              startIcon={<OpenInNewIcon />} sx={{ borderRadius: 1, flexShrink: 0 }}
+            >
+              {t('detail.viewAtSource')}
+            </Button>
+          )}
         </Stack>
+
+        <Card>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' } }}>
+            <StatTile label={t('detail.installsLabel')} value={String(data.install_count)} />
+            <StatTile label={t('detail.downloadsLabel')} value={String(data.download_count)} divider />
+            <StatTile
+              label={t('detail.updatedLabel')}
+              value={new Date(viewing?.created_at ?? data.updated_at).toLocaleDateString()}
+              divider
+            />
+          </Box>
+        </Card>
 
         {data.status === 'removed' && <Alert severity="error">{t('detail.removedBanner')}</Alert>}
         {data.upstream_status && data.upstream_status !== 'ok' && (
@@ -184,40 +215,21 @@ export function SkillDetailPage() {
         <InstallWarning skill={data} install={install} />
         {!latest && data.status !== 'removed' && <Alert severity="info">{t('detail.notPublished')}</Alert>}
 
-        <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 2fr) minmax(0, 1fr)' } }}>
-          <Stack spacing={3} sx={{ minWidth: 0 }}>
-            <Box component="section">
-              <Typography variant="h6" component="h2" gutterBottom>
-                {t('detail.summary')}
-              </Typography>
-              <Typography>{data.summary}</Typography>
-            </Box>
-
-            <Box component="section">
-              <Typography variant="h6" component="h2" gutterBottom>
-                {t('detail.content')}
-              </Typography>
-              {data.skill_md ? (
-                <MarkdownView source={data.skill_md} />
-              ) : (
-                <Typography color="text.secondary">{t('detail.noContent')}</Typography>
-              )}
-            </Box>
-
-            {versions.data && versions.data.length > 0 && (
-              <Box component="section">
-                <Typography variant="h6" component="h2" gutterBottom>
-                  {t('detail.versions')}
-                </Typography>
-                <VersionList
-                  versions={versions.data}
-                  viewing={viewing?.version}
-                  latest={latest?.version}
-                  onSelect={(v) => setParams(v ? { version: v } : {})}
-                />
-              </Box>
+        <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 2.2fr) minmax(0, 1fr)' } }}>
+          <Box sx={{ minWidth: 0 }}>
+            {viewing ? (
+              <SkillFilesPanel
+                key={`${data.id}-${viewing.version}`}
+                skillId={data.id}
+                skillName={data.name}
+                version={viewing.version}
+                skillMd={data.skill_md}
+                canDownload={installable}
+              />
+            ) : (
+              <Typography color="text.secondary">{t('detail.noContent')}</Typography>
             )}
-          </Stack>
+          </Box>
 
           <Box sx={{ alignSelf: 'start', position: { md: 'sticky' }, top: { md: 88 } }}>
             {viewing && (
@@ -230,7 +242,30 @@ export function SkillDetailPage() {
             )}
           </Box>
         </Box>
+
+        {versions.data && versions.data.length > 0 && (
+          <Box component="section">
+            <Typography variant="h6" component="h2" gutterBottom>
+              {t('detail.versions')}
+            </Typography>
+            <VersionList
+              versions={versions.data}
+              viewing={viewing?.version}
+              latest={latest?.version}
+              onSelect={(v) => setParams(v ? { version: v } : {})}
+            />
+          </Box>
+        )}
       </Stack>
     </Container>
+  )
+}
+
+function StatTile({ label, value, divider }: { label: string; value: string; divider?: boolean }) {
+  return (
+    <Box sx={{ px: 3, py: 2, borderLeft: { sm: divider ? 1 : 0 }, borderTop: { xs: divider ? 1 : 0, sm: 0 }, borderColor: 'divider' }}>
+      <Typography variant="h6" component="p" fontWeight={700}>{value}</Typography>
+      <Typography variant="caption" color="text.secondary">{label}</Typography>
+    </Box>
   )
 }

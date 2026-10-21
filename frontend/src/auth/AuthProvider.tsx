@@ -52,8 +52,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     try {
       await logoutRequest()
+    } catch {
+      // Phiên đã hết hạn (401) thì coi như đã đăng xuất; vẫn dọn trạng thái phía client.
     } finally {
-      queryClient.clear()
+      // Không dùng queryClient.clear(): nó gỡ query ['me'] khỏi cache khi AuthProvider còn đang quan sát,
+      // khiến trang kẹt ở trạng thái đang tải.
+      queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== ME_KEY[0] })
       queryClient.setQueryData(ME_KEY, null)
     }
   }, [queryClient])

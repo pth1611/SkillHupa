@@ -9,8 +9,9 @@ class SkillMetadata(BaseModel):
     """Thông tin do Creator nhập; mọi trường tuỳ chọn ở bước tải gói, bắt buộc khi gửi duyệt."""
 
     name: str | None = Field(None, max_length=100)
-    summary: str | None = Field(None, max_length=200)
+    summary: str | None = Field(None, max_length=1000)
     category_id: int | None = None
+    subcategory_id: int | None = None
     department: str | None = Field(None, max_length=255)
     visibility: Visibility | None = None
     version: str | None = Field(None, max_length=32)
@@ -27,8 +28,9 @@ class VersionUpdate(BaseModel):
 
 class SkillUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)
-    summary: str | None = Field(None, max_length=200)
+    summary: str | None = Field(None, max_length=1000)
     category_id: int | None = None
+    subcategory_id: int | None = None
     department: str | None = Field(None, max_length=255)
     visibility: Visibility | None = None
     tag_ids: list[int] | None = None
@@ -58,6 +60,7 @@ class Prefill(BaseModel):
     output_types: list[str] = []
     ecosystems: list[str] = []
     category_slug: str | None = None
+    subcategory_slug: str | None = None
     name_suggestion: str | None = None
 
 
@@ -85,6 +88,7 @@ class SkillOut(BaseModel):
     name: str
     summary: str | None = None
     category_id: int | None = None
+    subcategory_id: int | None = None
     department: str | None = None
     visibility: str
     status: str
@@ -158,12 +162,21 @@ class SkillCard(BaseModel):
     published_at: datetime | None = None
 
 
+class SubcategoryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    slug: str
+
+
 class CategoryOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     name: str
     slug: str
+    subcategories: list[SubcategoryOut] = []
 
 
 class TagOut(BaseModel):
@@ -188,11 +201,26 @@ class DownloadOut(BaseModel):
     checksum: str | None = None
 
 
+class SkillFileOut(BaseModel):
+    path: str
+    size: int
+    is_text: bool
+
+
+class SkillFileContentOut(BaseModel):
+    path: str
+    size: int
+    is_text: bool
+    too_large: bool
+    content: str | None = None
+
+
 class FacetsOut(BaseModel):
     """Số skill khớp theo từng giá trị phân loại, theo bộ lọc hiện tại (D52)."""
 
     total: int
     categories: dict[int, int]
+    subcategories: dict[int, int] = {}
     output_types: dict[str, int]
     ecosystems: dict[str, int]
 
@@ -221,3 +249,4 @@ class AutoClassifyOut(ClassificationOut):
     suggested_output_types: list[str]
     suggested_ecosystems: list[str]
     category_id: int | None
+    subcategory_id: int | None = None

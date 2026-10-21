@@ -60,6 +60,20 @@ class Category(Base):
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
 
+    subcategories: Mapped[list["Subcategory"]] = relationship(order_by="Subcategory.name", viewonly=True)
+
+
+class Subcategory(Base):
+    """Nhóm công việc nhỏ nằm trong một danh mục (vd. Lập trình → Kiểm thử)."""
+
+    __tablename__ = "subcategories"
+    __table_args__ = (UniqueConstraint("category_id", "slug", name="uq_subcategory_slug"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"), index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    slug: Mapped[str] = mapped_column(String(100), nullable=False)
+
 
 class Skill(Base):
     __tablename__ = "skills"
@@ -68,8 +82,9 @@ class Skill(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     # Khoá duy nhất theo tên (chữ thường); chỉ đặt khi gửi duyệt lần đầu.
     name_key: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True)
-    summary: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    summary: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     category_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id"), nullable=True)
+    subcategory_id: Mapped[int | None] = mapped_column(ForeignKey("subcategories.id"), index=True, nullable=True)
     department: Mapped[str | None] = mapped_column(String(255), nullable=True)
     visibility: Mapped[str] = mapped_column(String(16), default=Visibility.COMPANY.value, nullable=False)
     owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)

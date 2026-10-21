@@ -35,6 +35,13 @@ function setup(opts: { detail?: SkillDetailData; installs?: InstallItem[]; versi
       const base = opts.detail ?? skill()
       return v === '1.0.0' ? { ...base, viewing_version: version(1, '1.0.0') } : base
     },
+    '/api/skills/5/versions/1.1.0/files': () => [
+      { path: 'SKILL.md', size: 120, is_text: true },
+      { path: 'scripts/run.py', size: 30, is_text: true },
+    ],
+    '/api/skills/5/versions/1.1.0/files/content': () => ({
+      path: 'scripts/run.py', size: 30, is_text: true, too_large: false, content: 'print("xin chào")',
+    }),
     '/api/skills/5/versions': () => opts.versions ?? [version(1, '1.0.0'), version(2, '1.1.0')],
     '/api/installs/me': () => ({ items: opts.installs ?? [], total: 0, page: 1, page_size: 100 }),
     '/api/skills/5/download': () => ({ url: '/api/skills/5/versions/1.1.0/package', expires_at: null, version: '1.1.0', checksum: null }),
@@ -52,7 +59,8 @@ describe('SkillDetailPage', () => {
     renderApp('/skills/5')
     expect(await screen.findByRole('heading', { name: 'Báo cáo tuần', level: 1 })).toBeInTheDocument()
     expect(screen.getByText(/Chủ skill: Lan Trần/)).toBeInTheDocument()
-    expect(screen.getByText('12 lượt cài · 3 lượt tải')).toBeInTheDocument()
+    expect(screen.getByText('12')).toBeInTheDocument()
+    expect(await screen.findByText('2 file · 150 B')).toBeInTheDocument()
     expect(screen.getByTestId('install-command')).toHaveTextContent(
       'skillmkt install 5 --target claude-code',
     )
@@ -60,10 +68,17 @@ describe('SkillDetailPage', () => {
     expect(screen.getAllByText('Mới nhất').length).toBeGreaterThan(0)
   })
 
+  it('chọn file trong cây thư mục để xem nội dung', async () => {
+    setup()
+    renderApp('/skills/5')
+    await userEvent.click(await screen.findByRole('button', { name: 'run.py' }))
+    expect(await screen.findByText('print("xin chào")')).toBeInTheDocument()
+  })
+
   it('làm sạch Markdown: không script, không liên kết javascript:, không ảnh ngoài', async () => {
     setup()
     const { container } = renderApp('/skills/5')
-    await screen.findByText('Hướng dẫn')
+    await screen.findByRole('heading', { name: 'Hướng dẫn', level: 1 })
     expect(container.querySelector('script')).toBeNull()
     expect(container.querySelector('img[src*="tracker"]')).toBeNull()
     const ok = screen.getByRole('link', { name: 'ok' })
@@ -94,7 +109,7 @@ describe('SkillDetailPage', () => {
   it('tải .zip gọi download?intent=zip rồi bắt đầu tải', async () => {
     const { calls } = setup()
     renderApp('/skills/5')
-    await userEvent.click(await screen.findByRole('tab', { name: '.zip' }))
+    await userEvent.click(await screen.findByRole('tab', { name: 'Thủ công' }))
     await userEvent.click(screen.getByRole('button', { name: 'Tải .zip' }))
     await waitFor(() => expect(startDownload).toHaveBeenCalledWith('/api/skills/5/versions/1.1.0/package'))
     const call = calls.find((c) => c.url.pathname === '/api/skills/5/download')!

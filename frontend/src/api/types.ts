@@ -38,10 +38,17 @@ export interface SkillCardData {
   published_at: string | null
 }
 
+export interface Subcategory {
+  id: number
+  name: string
+  slug: string
+}
+
 export interface Category {
   id: number
   name: string
   slug: string
+  subcategories?: Subcategory[]
 }
 
 export interface Taxonomy {
@@ -53,6 +60,7 @@ export interface Taxonomy {
 export interface FacetsData {
   total: number
   categories: Record<string, number>
+  subcategories?: Record<string, number>
   output_types: Record<string, number>
   ecosystems: Record<string, number>
 }
@@ -122,6 +130,17 @@ export interface InstallItem {
   latest_version: string | null
   state: InstallState
   installed_at: string
+}
+
+export interface SkillFile {
+  path: string
+  size: number
+  is_text: boolean
+}
+
+export interface SkillFileContent extends SkillFile {
+  too_large: boolean
+  content: string | null
 }
 
 export interface DownloadInfo {

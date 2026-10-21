@@ -83,6 +83,13 @@ def next_internal_version(skill: Skill | None) -> str:
     return f"0.0.{top + 1}"
 
 
+def refresh_truncated_summary(skill: Skill, description: str | None) -> None:
+    """Bản nhập cũ bị cắt ở 200 ký tự: nếu mô tả cũ chỉ là phần đầu của mô tả mới thì bổ sung cho đủ, không đụng phần admin đã sửa."""
+    full = (description or "")[:1000]
+    if full and skill.summary != full and full.startswith(skill.summary or ""):
+        skill.summary = full
+
+
 def import_version(
     db: Session,
     storage: BlobStorage,
@@ -119,8 +126,9 @@ def import_version(
             db,
             Skill(
                 name=name,
-                summary=(prefill.description or "")[:200] or None,
+                summary=(prefill.description or "")[:1000] or None,
                 category_id=category_id,
+                subcategory_id=repository.subcategory_id_by_slug(db, category_id, guess.subcategory_slug),
                 department=department,
                 visibility=Visibility(visibility).value,
                 owner_id=None,
@@ -141,6 +149,7 @@ def import_version(
         skill.source_url = source_url
         skill.upstream_author = upstream_author
         skill.last_synced_at = now
+        refresh_truncated_summary(skill, prefill.description)
 
     changelog = f"Nhập tự động từ {source_url} tại commit {source_commit[:7]}"
     ver = repository.add_version(

@@ -6,6 +6,7 @@ import {
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { categoryLabel } from '../../i18n/taxonomyLabels'
 import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchCategories, fetchDepartments, fetchFeatured, searchSkills, skillKeys, type SkillQuery } from '../../api/skills'
 import type { Category, SkillCardData } from '../../api/types'
@@ -91,10 +92,10 @@ function SearchBox() {
           ),
           endAdornment: (
             <InputAdornment position="end">
-              <Chip size="small" label="⌘K" sx={{ borderRadius: 1.5, fontWeight: 600, display: { xs: 'none', sm: 'flex' } }} />
+              <Chip size="small" label="⌘K" sx={{ borderRadius: 1, fontWeight: 600, display: { xs: 'none', sm: 'flex' } }} />
             </InputAdornment>
           ),
-          sx: { bgcolor: 'background.paper', borderRadius: 999, height: 60, pl: 2.5, pr: 2 },
+          sx: { bgcolor: 'background.paper', borderRadius: 2, height: 60, pl: 2.5, pr: 2 },
         }}
         sx={{ '& fieldset': { borderColor: 'divider' } }}
       />
@@ -187,7 +188,7 @@ function CallToAction() {
   const { user } = useAuth()
   const canCreate = user?.role === 'creator' || user?.role === 'manager'
   return (
-    <Card sx={{ bgcolor: 'action.hover', borderRadius: 4 }}>
+    <Card sx={{ bgcolor: 'action.hover', borderRadius: 2 }}>
       <CardContent>
         <Stack spacing={1.5} alignItems="flex-start">
           <Typography variant="h5" component="h2">
@@ -213,7 +214,7 @@ function CategoryTabs({ categories, value }: { categories: Category[]; value: nu
     >
       <Tab value="all" label={t('home.tabAll')} />
       {categories.map((c) => (
-        <Tab key={c.id} value={c.id} label={c.name} />
+        <Tab key={c.id} value={c.id} label={categoryLabel(t, c)} />
       ))}
     </Tabs>
   )
@@ -246,7 +247,7 @@ export function HomePage() {
     .slice(0, BLOCK_SIZE)
   const newestItems = newest.data?.items ?? []
 
-  const categoryNames = useMemo(() => new Map((categories.data ?? []).map((c) => [c.id, c.name])), [categories.data])
+  const categoryNames = useMemo(() => new Map((categories.data ?? []).map((c) => [c.id, categoryLabel(t, c)])), [categories.data, t])
   const stats =
     categories.data && newest.data && departments.data
       ? { skills: newest.data.total, categories: categories.data.length, departments: departments.data.length }
@@ -296,7 +297,7 @@ export function HomePage() {
             const items = blocks[index]?.data?.items ?? []
             if (items.length === 0) return null // khối rỗng thì ẩn, không hiện khung trống
             return (
-              <Section key={category.id} title={category.name} viewAllTo={`/skills?category=${category.id}`}>
+              <Section key={category.id} title={categoryLabel(t, category)} viewAllTo={`/skills?category=${category.id}`}>
                 <SkillGrid skills={items} categoryNames={categoryNames} />
               </Section>
             )

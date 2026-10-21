@@ -4,6 +4,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { categoryLabel } from '../../i18n/taxonomyLabels'
 import {
   adminKeys, fetchAdminVersions, fetchImpact, fetchUsers, patchImportedSkill, removeSkill, restoreSkill, revokeVersion,
   transferSkill,
@@ -254,7 +255,7 @@ function EditForm({
 }: {
   skillId: number
   initial: { summary: string; category_id: number | ''; department: string; visibility: 'company' | 'department'; tag_ids: number[] }
-  categories: { id: number; name: string }[]
+  categories: { id: number; name: string; slug: string }[]
   departments: string[]
   tags: { id: number; name: string }[]
   onClose: () => void
@@ -290,11 +291,11 @@ function EditForm({
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
           <Typography variant="body2" color="text.secondary">{t('admin.editInfo')}</Typography>
-          <TextField label={t('studio.summary')} multiline minRows={2} value={v.summary} inputProps={{ maxLength: 200 }}
-            onChange={(e) => setV({ ...v, summary: e.target.value })} helperText={`${v.summary.length}/200`} />
+          <TextField label={t('studio.summary')} multiline minRows={2} value={v.summary} inputProps={{ maxLength: 1000 }}
+            onChange={(e) => setV({ ...v, summary: e.target.value })} helperText={`${v.summary.length}/1000`} />
           <TextField select label={t('studio.category')} value={v.category_id}
             onChange={(e) => setV({ ...v, category_id: Number(e.target.value) })}>
-            {categories.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+            {categories.map((c) => <MenuItem key={c.id} value={c.id}>{categoryLabel(t, c)}</MenuItem>)}
           </TextField>
           {departments.length > 0 ? (
             <TextField select label={t('studio.department')} value={v.department}

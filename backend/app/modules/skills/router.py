@@ -27,6 +27,8 @@ from app.modules.skills.schemas import (
     FindingOut,
     SkillCard,
     SkillDetail,
+    SkillFileContentOut,
+    SkillFileOut,
     SkillMetadata,
     SkillMineItem,
     SkillOut,
@@ -312,6 +314,7 @@ def search_skills(
     page: Annotated[PageParams, Depends()],
     q: str | None = Query(None, max_length=100),
     category: int | None = None,
+    subcategory: int | None = None,
     department: str | None = None,
     tag: Annotated[list[str] | None, Query()] = None,
     output_type: Annotated[list[str] | None, Query()] = None,
@@ -319,7 +322,7 @@ def search_skills(
     sort: Literal["newest", "popular", "name"] = "newest",
 ) -> Page[SkillCard]:
     items, total = service.search(
-        db, user, q=q, category_id=category, department=department, tags=tag or [],
+        db, user, q=q, category_id=category, subcategory_id=subcategory, department=department, tags=tag or [],
         output_types=output_type or [], ecosystems=ecosystem or [], sort=sort, offset=page.offset, limit=page.page_size,
     )
     return Page(items=items, total=total, page=page.page, page_size=page.page_size)
@@ -345,13 +348,14 @@ def skill_facets(
     user: CurrentUser,
     q: str | None = Query(None, max_length=100),
     category: int | None = None,
+    subcategory: int | None = None,
     department: str | None = None,
     tag: Annotated[list[str] | None, Query()] = None,
     output_type: Annotated[list[str] | None, Query()] = None,
     ecosystem: Annotated[list[str] | None, Query()] = None,
 ) -> FacetsOut:
     return service.facets(
-        db, user, q=q, category_id=category, department=department, tags=tag or [],
+        db, user, q=q, category_id=category, subcategory_id=subcategory, department=department, tags=tag or [],
         output_types=output_type or [], ecosystems=ecosystem or [],
     )
 
@@ -409,6 +413,19 @@ def download_package(
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="skill-{skill_id}-{ver.version}.zip"'},
     )
+
+
+@router.get("/{skill_id}/versions/{version}/files", response_model=list[SkillFileOut])
+def version_files(skill_id: int, version: str, db: DbSession, user: CurrentUser) -> list[SkillFileOut]:
+    return [SkillFileOut(path=f.path, size=f.size, is_text=f.is_text) for f in service.files_for(db, user, skill_id, version)]
+
+
+@router.get("/{skill_id}/versions/{version}/files/content", response_model=SkillFileContentOut)
+def version_file_content(
+    skill_id: int, version: str, db: DbSession, storage: Storage, user: CurrentUser,
+    path: str = Query(..., max_length=1000),
+) -> SkillFileContentOut:
+    return SkillFileContentOut(**service.file_text_for(db, storage, user, skill_id, version, path))
 
 
 @router.get("/{skill_id}", response_model=SkillDetail)

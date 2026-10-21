@@ -52,7 +52,7 @@ export function AppLayout() {
           >
             <Box
               sx={(theme) => ({
-                width: 36, height: 36, borderRadius: 2, display: 'grid', placeItems: 'center',
+                width: 36, height: 36, borderRadius: 1.5, display: 'grid', placeItems: 'center',
                 color: '#fff', fontWeight: 800, fontSize: '1.15rem',
                 backgroundImage: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
               })}

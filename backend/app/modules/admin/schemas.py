@@ -107,7 +107,7 @@ class Dashboard(BaseModel):
 class ImportedSkillUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    summary: str | None = Field(None, max_length=200)
+    summary: str | None = Field(None, max_length=1000)
     category_id: int | None = None
     department: str | None = Field(None, min_length=1, max_length=255)
     visibility: Literal["company", "department"] | None = None

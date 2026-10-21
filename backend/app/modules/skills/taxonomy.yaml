@@ -82,3 +82,42 @@ signals:
     marketing-ban-hang: [marketing, sales, campaign, crm, lead, e-commerce, advertising, bán hàng, quảng cáo, khách hàng]
     nhan-su: [hr, recruitment, recruiting, onboarding, resume, cv, payroll, nhân sự, tuyển dụng]
     tai-chinh-phap-che: [finance, accounting, invoice, budget, tax, legal, contract, compliance, tài chính, kế toán, pháp chế, hợp đồng]
+  # Nhóm công việc nhỏ theo danh mục (slug danh mục → slug nhóm con); chấm điểm giống danh mục.
+  subcategories:
+    bao-cao-tai-lieu:
+      bien-ban-hop: [minutes, meeting notes, biên bản, họp]
+      bao-cao-dinh-ky: [weekly report, monthly report, status report, báo cáo tuần, báo cáo tháng, báo cáo]
+      soan-thao-van-ban: [memo, template, docx, soạn thảo, văn bản, công văn]
+    du-lieu-phan-tich:
+      bang-tinh: [spreadsheet, excel, xlsx, csv, pandas, bảng tính]
+      truy-van-sql: [sql, query, database, postgres, truy vấn]
+      dashboard-truc-quan: [dashboard, chart, visualization, bi, biểu đồ, trực quan]
+    lap-trinh:
+      kiem-thu: [test, pytest, unit test, jest, qa, kiểm thử]
+      review-refactor: [code review, refactor, lint, clean code, review code]
+      debug-sua-loi: [debug, bug, fix, error, stack trace, sửa lỗi]
+      tai-lieu-ma-nguon: [docstring, readme, api docs, comment, tài liệu mã nguồn]
+    tu-dong-hoa:
+      ci-cd: [ci/cd, pipeline, deploy, docker, github actions, triển khai]
+      lap-lich: [cron, scheduler, schedule, workflow, lập lịch]
+      tich-hop-api: [api, webhook, integration, rest, tích hợp]
+    noi-dung-truyen-thong:
+      viet-bai: [blog, article, copywriting, newsletter, viết bài]
+      mang-xa-hoi: [social media, facebook, linkedin, tiktok, mạng xã hội]
+      hinh-anh-video: [image, video, thumbnail, poster, hình ảnh]
+      seo: [seo, keyword, backlink, meta description]
+    nang-suat-van-phong:
+      email-lich-hop: [email, calendar, meeting, outlook, lịch họp]
+      ghi-chu-cong-viec: [notes, to-do, task, todo, ghi chú, công việc]
+    marketing-ban-hang:
+      chien-dich-quang-cao: [campaign, advertising, ads, quảng cáo, chiến dịch]
+      crm-khach-hang: [crm, lead, customer, khách hàng]
+      thuong-mai-dien-tu: [e-commerce, shop, product listing, thương mại điện tử]
+    nhan-su:
+      tuyen-dung: [recruitment, recruiting, resume, cv, interview, tuyển dụng]
+      onboarding: [onboarding, orientation, new hire, nhân viên mới]
+      luong-phuc-loi: [payroll, salary, benefits, leave, lương, phúc lợi]
+    tai-chinh-phap-che:
+      ke-toan-hoa-don: [accounting, invoice, bookkeeping, kế toán, hoá đơn]
+      ngan-sach-thue: [budget, tax, forecast, ngân sách, thuế]
+      hop-dong-phap-ly: [contract, legal, compliance, clause, hợp đồng, pháp lý]

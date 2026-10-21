@@ -8,9 +8,10 @@ from app.core.exceptions import Conflict
 from app.core.storage import BlobStorage
 from app.modules.audit import service as audit
 from app.modules.installs import repository as installs_repo
-from app.modules.skills import classifier, packaging, repository, taxonomy, validation
+from app.modules.skills import classifier, packaging, repository, review_api, taxonomy, validation
 from app.modules.skills.exceptions import (
     InvalidPackage,
+    InvalidSubcategory,
     PackageTooLarge,
     SkillNotFound,
     SubmissionIncomplete,
@@ -161,6 +162,7 @@ def _prefill(info: packaging.PackageInfo) -> Prefill:
         output_types=guess.output_types,
         ecosystems=guess.ecosystems,
         category_slug=guess.category_slug,
+        subcategory_slug=guess.subcategory_slug,
         name_suggestion=classifier.suggest_name(info),
     )
 
@@ -259,6 +261,7 @@ def create_skill(
             name=(meta.name or prefill.name or "Chưa đặt tên").strip(),
             summary=meta.summary,
             category_id=meta.category_id,
+            subcategory_id=_checked_subcategory(db, meta.category_id, meta.subcategory_id),
             department=meta.department or user.department,
             visibility=(meta.visibility or Visibility.COMPANY).value,
             owner_id=user.id,
@@ -460,14 +463,20 @@ def staff_classify_auto(
     cat_id = repository.category_id_by_slug(db, guess.category_slug)
     if cat_id and (force or skill.category_id is None):
         skill.category_id = cat_id
+        skill.subcategory_id = None
         applied = True
+    if skill.category_id and (force or skill.subcategory_id is None):
+        sub_id = repository.subcategory_id_by_slug(db, skill.category_id, guess.subcategory_slug)
+        if sub_id:
+            skill.subcategory_id = sub_id
+            applied = True
     audit.record(db, staff, "skill.classify_auto", "skill", skill.id,
                  {"force": force, "applied": applied, "output_types": guess.output_types,
                   "ecosystems": guess.ecosystems, "category_id": skill.category_id})
     current = repository.facet_slugs_of(db, [skill.id]).get(skill.id, {taxonomy.OUTPUT_TYPE: [], taxonomy.ECOSYSTEM: []})
     return {"applied": applied, "output_types": current[taxonomy.OUTPUT_TYPE], "ecosystems": current[taxonomy.ECOSYSTEM],
             "suggested_output_types": guess.output_types, "suggested_ecosystems": guess.ecosystems,
-            "category_id": skill.category_id}
+            "category_id": skill.category_id, "subcategory_id": skill.subcategory_id}
 
 
 def _set_tags(db: Session, user: User, skill: Skill, tag_ids: list[int]) -> None:
@@ -502,6 +511,14 @@ def _widens(skill: Skill, visibility: str, department: str | None) -> bool:
     return skill.visibility == Visibility.DEPARTMENT.value and department != skill.department
 
 
+def _checked_subcategory(db: Session, category_id: int | None, subcategory_id: int | None) -> int | None:
+    if subcategory_id is None:
+        return None
+    if not repository.subcategory_belongs(db, subcategory_id, category_id):
+        raise InvalidSubcategory()
+    return subcategory_id
+
+
 def update_skill(
     db: Session, settings: Settings, user: User, skill_id: int, body: SkillUpdate
 ) -> tuple[Skill, PendingVisibilityChange | None]:
@@ -523,6 +540,13 @@ def update_skill(
             pending = PendingVisibilityChange(skill.visibility, new_vis, skill.department, new_dept)
             data.pop("visibility", None)
             data.pop("department", None)
+
+    if "category_id" in data or "subcategory_id" in data:
+        category_id = data.get("category_id", skill.category_id)
+        if "subcategory_id" in data:
+            data["subcategory_id"] = _checked_subcategory(db, category_id, data["subcategory_id"])
+        elif category_id != skill.category_id:  # đổi danh mục thì nhóm con cũ không còn hợp lệ
+            data["subcategory_id"] = None
 
     for key, value in data.items():
         setattr(skill, key, value.value if isinstance(value, Visibility) else value)
@@ -635,6 +659,7 @@ def search(
     tags: list[str],
     output_types: list[str] | None = None,
     ecosystems: list[str] | None = None,
+    subcategory_id: int | None = None,
     sort: str,
     offset: int,
     limit: int,
@@ -646,6 +671,7 @@ def search(
         is_manager=user.role == Role.MANAGER.value,
         q=q,
         category_id=category_id,
+        subcategory_id=subcategory_id,
         department=department,
         tags=tags,
         output_types=output_types,
@@ -667,6 +693,7 @@ def facets(
     tags: list[str],
     output_types: list[str],
     ecosystems: list[str],
+    subcategory_id: int | None = None,
 ) -> FacetsOut:
     counts = repository.facet_counts(
         db,
@@ -675,6 +702,7 @@ def facets(
         is_manager=user.role == Role.MANAGER.value,
         q=q,
         category_id=category_id,
+        subcategory_id=subcategory_id,
         department=department,
         tags=tags,
         output_types=output_types,
@@ -683,6 +711,7 @@ def facets(
     return FacetsOut(
         total=counts["total"],
         categories=counts["category"],
+        subcategories=counts["subcategory"],
         output_types=counts[taxonomy.OUTPUT_TYPE],
         ecosystems=counts[taxonomy.ECOSYSTEM],
     )
@@ -772,6 +801,26 @@ def package_for(db: Session, storage: BlobStorage, user: User, skill_id: int, ve
     if ver.status != VersionStatus.PUBLISHED.value or not ver.package_key:
         raise VersionNotFound()
     return storage.get(ver.package_key), ver
+
+
+def files_for(db: Session, user: User, skill_id: int, version: str) -> list[SkillVersionFile]:
+    skill = get_visible_skill(db, user, skill_id)
+    ver = _servable_version(db, skill, user, version)
+    return sorted(ver.files, key=lambda f: f.path)
+
+
+def file_text_for(
+    db: Session, storage: BlobStorage, user: User, skill_id: int, version: str, path: str
+) -> dict:
+    skill = get_visible_skill(db, user, skill_id)
+    ver = _servable_version(db, skill, user, version)
+    content = review_api.file_content(storage, ver, None, path)
+    if content is None:
+        raise VersionNotFound("Không có file này trong gói")
+    return {
+        "path": content["path"], "size": content["size"], "is_text": content["is_text"],
+        "too_large": content["too_large"], "content": content["new"],
+    }
 
 
 # ---- tag --------------------------------------------------------------------

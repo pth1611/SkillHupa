@@ -12,7 +12,7 @@ export function buildTheme(mode: PaletteMode): Theme {
           ? { default: '#050506', paper: '#0d0d10' }
           : { default: '#f7f8fa', paper: '#ffffff' },
     },
-    shape: { borderRadius: 12 },
+    shape: { borderRadius: 6 },
     typography: {
       fontFamily: '"Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
       h3: { fontWeight: 800, letterSpacing: '-0.03em' },
@@ -22,7 +22,7 @@ export function buildTheme(mode: PaletteMode): Theme {
     components: {
       MuiCard: { defaultProps: { variant: 'outlined' } },
       MuiAppBar: { defaultProps: { elevation: 0, color: 'default' } },
-      MuiButton: { styleOverrides: { root: { borderRadius: 999 } } },
+      MuiButton: { styleOverrides: { root: { borderRadius: 6 } } },
     },
   })
 }

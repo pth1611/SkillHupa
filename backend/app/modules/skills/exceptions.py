@@ -17,6 +17,12 @@ class InvalidPackage(AppError):
     message = "Gói không hợp lệ"
 
 
+class InvalidSubcategory(AppError):
+    status_code = 400
+    code = "INVALID_SUBCATEGORY"
+    message = "Nhóm công việc không thuộc danh mục đã chọn"
+
+
 class PackageTooLarge(AppError):
     status_code = 413
     code = "PACKAGE_TOO_LARGE"

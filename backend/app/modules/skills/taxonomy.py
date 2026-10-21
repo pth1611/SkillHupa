@@ -39,4 +39,5 @@ def load_signals() -> dict:
         "output_types": {s: c for s, c in data["output_types"].items() if s in valid[OUTPUT_TYPE]},
         "ecosystems": {s: c for s, c in data["ecosystems"].items() if s in valid[ECOSYSTEM]},
         "categories": data["categories"],
+        "subcategories": data.get("subcategories", {}),
     }

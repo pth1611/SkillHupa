@@ -9,6 +9,7 @@ from app.modules.skills.models import (
     SkillTag,
     SkillVersion,
     SkillVersionFile,
+    Subcategory,
     Tag,
     TagStatus,
     ValidationResult,
@@ -112,10 +113,11 @@ def _filtered(
     tags: list[str],
     output_types: list[str],
     ecosystems: list[str],
+    subcategory_id: int | None = None,
     skip: str | None = None,
 ):
     """Truy vấn skill đã đăng mà người xem được thấy, kèm bộ lọc. `skip` bỏ một chiều lọc
-    (`category`, `output_type`, `ecosystem`) để đếm facet kiểu "chọn thêm giá trị khác"."""
+    (`category` bỏ cả danh mục lẫn nhóm con, `output_type`, `ecosystem`) để đếm facet kiểu "chọn thêm giá trị khác"."""
     stmt = select(Skill).where(Skill.status == SkillStatus.PUBLISHED.value)
     if not is_manager:
         allowed = [Skill.visibility == Visibility.COMPANY.value, Skill.owner_id == viewer_id]
@@ -124,6 +126,8 @@ def _filtered(
         stmt = stmt.where(or_(*allowed))
     if category_id is not None and skip != "category":
         stmt = stmt.where(Skill.category_id == category_id)
+    if subcategory_id is not None and skip != "category":
+        stmt = stmt.where(Skill.subcategory_id == subcategory_id)
     if department:
         stmt = stmt.where(Skill.department == department)
     for kind, slugs in ((OUTPUT_TYPE, output_types), (ECOSYSTEM, ecosystems)):
@@ -168,13 +172,14 @@ def search_published(
     tags: list[str],
     output_types: list[str] | None = None,
     ecosystems: list[str] | None = None,
+    subcategory_id: int | None = None,
     sort: str,
     offset: int,
     limit: int,
 ) -> tuple[list[Skill], int]:
     stmt = _filtered(
         viewer_id=viewer_id, viewer_department=viewer_department, is_manager=is_manager, q=q,
-        category_id=category_id, department=department, tags=tags,
+        category_id=category_id, subcategory_id=subcategory_id, department=department, tags=tags,
         output_types=output_types or [], ecosystems=ecosystems or [],
     )
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
@@ -198,11 +203,12 @@ def facet_counts(
     tags: list[str],
     output_types: list[str],
     ecosystems: list[str],
+    subcategory_id: int | None = None,
 ) -> dict[str, dict]:
     """Số skill khớp cho từng giá trị của mỗi chiều phân loại, áp dụng mọi bộ lọc khác và phạm vi xem."""
     common = {
         "viewer_id": viewer_id, "viewer_department": viewer_department, "is_manager": is_manager, "q": q,
-        "category_id": category_id, "department": department, "tags": tags,
+        "category_id": category_id, "subcategory_id": subcategory_id, "department": department, "tags": tags,
         "output_types": output_types, "ecosystems": ecosystems,
     }
     out: dict[str, dict] = {}
@@ -211,6 +217,14 @@ def facet_counts(
         cid: n
         for cid, n in db.execute(
             select(base.c.category_id, func.count()).where(base.c.category_id.is_not(None)).group_by(base.c.category_id)
+        )
+    }
+    out["subcategory"] = {
+        sid: n
+        for sid, n in db.execute(
+            select(base.c.subcategory_id, func.count())
+            .where(base.c.subcategory_id.is_not(None))
+            .group_by(base.c.subcategory_id)
         )
     }
     for kind in (OUTPUT_TYPE, ECOSYSTEM):
@@ -304,6 +318,18 @@ def versions_by_id(db: Session, version_ids: list[int]) -> dict[int, SkillVersio
 
 def category_id_by_slug(db: Session, slug: str | None) -> int | None:
     return db.scalar(select(Category.id).where(Category.slug == slug)) if slug else None
+
+
+def subcategory_id_by_slug(db: Session, category_id: int | None, slug: str | None) -> int | None:
+    if not (category_id and slug):
+        return None
+    return db.scalar(select(Subcategory.id).where(Subcategory.category_id == category_id, Subcategory.slug == slug))
+
+
+def subcategory_belongs(db: Session, subcategory_id: int, category_id: int | None) -> bool:
+    return db.scalar(
+        select(Subcategory.id).where(Subcategory.id == subcategory_id, Subcategory.category_id == category_id)
+    ) is not None
 
 
 def list_categories(db: Session) -> list[Category]:

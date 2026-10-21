@@ -1,13 +1,14 @@
 import { api } from './client'
 import { installKeys } from './installs'
 import type {
-  Category, DownloadInfo, FacetsData, Page, SkillCardData, SkillDetailData, SkillSort, TagData, Taxonomy,
+  Category, DownloadInfo, FacetsData, Page, SkillFile, SkillFileContent, SkillCardData, SkillDetailData, SkillSort, TagData, Taxonomy,
   VersionData,
 } from './types'
 
 export interface SkillQuery {
   q?: string
   category?: number
+  subcategory?: number
   department?: string
   tag?: string[]
   output_type?: string[]
@@ -22,6 +23,7 @@ export const skillKeys = {
   search: (query: SkillQuery) => ['skills', 'search', query] as const,
   detail: (id: number, version?: string) => ['skills', 'detail', id, version ?? 'latest'] as const,
   versions: (id: number) => ['skills', 'versions', id] as const,
+  files: (id: number, version: string) => ['skills', 'files', id, version] as const,
   categories: ['categories'] as const,
   taxonomy: ['taxonomy'] as const,
   facets: (query: SkillQuery) => ['skills', 'facets', query] as const,
@@ -61,3 +63,9 @@ export const requestDownload = (id: number, version: string, intent: 'install' |
 
 export const skillIconUrl = (id: number, version?: string) =>
   version ? `/api/skills/${id}/icon?version=${encodeURIComponent(version)}` : `/api/skills/${id}/icon`
+
+export const fetchSkillFiles = (id: number, version: string) =>
+  api<SkillFile[]>(`/api/skills/${id}/versions/${encodeURIComponent(version)}/files`)
+
+export const fetchSkillFileContent = (id: number, version: string, path: string) =>
+  api<SkillFileContent>(`/api/skills/${id}/versions/${encodeURIComponent(version)}/files/content`, { params: { path } })

@@ -6,6 +6,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { categoryLabel } from '../../i18n/taxonomyLabels'
 import {
   adminKeys, createSource, deleteSource, fetchScans, fetchSources, scanSource, sourceKeys, updateSource,
   type SourceInput,
@@ -74,7 +75,7 @@ function SourceForm({ source, onClose, onSaved }: { source: SourceData | null; o
             onChange={(e) => setCategory(e.target.value === 'auto' ? 'auto' : Number(e.target.value))}
             helperText={category === 'auto' ? t('admin.sources.categoryAutoHelp') : undefined}>
             <MenuItem value="auto">{t('admin.sources.categoryAuto')}</MenuItem>
-            {(categories.data ?? []).map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+            {(categories.data ?? []).map((c) => <MenuItem key={c.id} value={c.id}>{categoryLabel(t, c)}</MenuItem>)}
           </TextField>
           {(departments.data ?? []).length > 0 ? (
             <TextField select required label={t('studio.department')} value={department}

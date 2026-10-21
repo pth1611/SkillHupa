@@ -34,7 +34,7 @@ export function SkillCard({ skill, categoryName }: { skill: SkillCardData; categ
     <Card
       sx={{
         height: '100%',
-        borderRadius: 4,
+        borderRadius: 2,
         transition: 'border-color .2s, transform .2s',
         '&:hover': { borderColor: 'primary.main', transform: 'translateY(-2px)' },
       }}

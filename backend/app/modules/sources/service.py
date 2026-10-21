@@ -278,6 +278,7 @@ def _import_dir(
 
     hashes = {f.path: f.sha256 for f in peek.files}
     if existing is not None and import_api.latest_file_hashes(existing) == hashes:
+        import_api.refresh_truncated_summary(existing, str(fm["description"]).strip())
         run.add(label, "unchanged", skill_id=existing.id)
         return
 

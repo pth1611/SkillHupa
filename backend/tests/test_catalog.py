@@ -66,6 +66,45 @@ def test_search_filters_category_department_tag(w):
     assert names(w.user.get("/api/skills", params={"category": w.category() + 99})) == []
 
 
+def test_search_filters_subcategory_and_counts(w):
+    from app.core.database import get_session_factory
+    from app.modules.skills.models import Skill, Subcategory
+
+    a, _ = publish(w, " A")
+    b, _ = publish(w, " B")
+    cat = w.category()
+    with get_session_factory()() as db:
+        s1, s2 = Subcategory(category_id=cat, name="Một", slug="mot"), Subcategory(category_id=cat, name="Hai", slug="hai")
+        db.add_all([s1, s2])
+        db.flush()
+        db.get(Skill, a).subcategory_id = s1.id
+        db.get(Skill, b).subcategory_id = s2.id
+        db.commit()
+        s1_id, s2_id = s1.id, s2.id
+    assert names(w.user.get("/api/skills", params={"subcategory": s1_id})) == ["Báo cáo tuần A"]
+    counts = w.user.get("/api/skills/facets", params={"subcategory": s1_id}).json()
+    assert counts["subcategories"] == {str(s1_id): 1, str(s2_id): 1}  # số đếm không bị ràng buộc bởi nhóm đang chọn
+    cats = w.user.get("/api/categories").json()
+    assert {c["id"]: [x["slug"] for x in c["subcategories"]] for c in cats}[cat] == ["hai", "mot"]
+
+
+def test_update_rejects_subcategory_of_other_category(w):
+    from app.core.database import get_session_factory
+    from app.modules.skills.models import Category, Subcategory
+
+    sid, _, _ = w.submit()
+    with get_session_factory()() as db:
+        other = Category(name="Khác nữa", slug="khac-nua")
+        db.add(other)
+        db.flush()
+        sub = Subcategory(category_id=other.id, name="X", slug="x")
+        db.add(sub)
+        db.commit()
+        sub_id = sub.id
+    r = w.creator.patch(f"/api/skills/{sid}", json={"subcategory_id": sub_id}, headers=csrf_headers(w.creator))
+    assert r.status_code == 400 and r.json()["error"]["code"] == "INVALID_SUBCATEGORY"
+
+
 def test_search_sort_and_paging(w):
     publish(w, " B")
     publish(w, " A")
@@ -355,3 +394,20 @@ def test_update_classification(w):
     assert ok.json()["output_types"] == ["video"]
     detail = w.user.get(f"/api/skills/{sid}").json()
     assert detail["output_types"] == ["video"] and detail["ecosystems"] == ["teams"]
+
+
+def test_public_file_listing_and_content(w):
+    sid, _ = publish(w, visibility="department", department="Kế toán")
+    files = w.user.get(f"/api/skills/{sid}/versions/1.0.0/files")
+    assert files.status_code == 200
+    paths = [f["path"] for f in files.json()]
+    assert "SKILL.md" in paths
+    content = w.user.get(f"/api/skills/{sid}/versions/1.0.0/files/content", params={"path": "SKILL.md"})
+    assert content.status_code == 200
+    assert content.json()["content"]
+    assert w.user.get(
+        f"/api/skills/{sid}/versions/1.0.0/files/content", params={"path": "nope.txt"}
+    ).status_code == 404
+    other = TestClient(w.app)
+    login(other, "o@example.com", role="user", department="Nhân sự")
+    assert other.get(f"/api/skills/{sid}/versions/1.0.0/files").status_code == 404
